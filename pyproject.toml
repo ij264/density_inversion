@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "density-inversion"
+dynamic = ["version"]
+description = "Mantle density from topography and the geoid: the forward problem as pygeoinf operators"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Issac Jacob" }]
+# flowkernels is private: install it first from its own repository (see the README)
+dependencies = ["numpy>=1.24", "scipy>=1.10", "pyshtools", "pygeoinf", "flowkernels>=0.1.0"]
+
+[project.optional-dependencies]
+figures = ["matplotlib", "cartopy"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+density_inversion = ["data/*.csv"]
+
+[tool.setuptools.dynamic]
+version = { attr = "density_inversion.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,11 @@
+# generated: rerun the scripts to recreate them
+figures/output/
+*.npz
+*.npy
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
