@@ -13,24 +13,30 @@ water in the oceans and air on land, so
     drho(x) = rho_LAB - rho_w C(x),        C the ocean function (1 ocean, 0 land).
 
 The deflection is the topography: the surface moves with the plate, and water fills the deflection at sea.
-Bending uses the flat-plate operator on the sphere, nabla^4 -> [l(l+1)/R^2]^2. The thin spherical shell adds a
-membrane term E T_e / R^2 (about 0.4 % of drho g at T_e = 40 km) and replaces [l(l+1)]^2 by l(l+1)(l(l+1) - 4),
-which matters only at low degree where bending is negligible; both are left out.
+Both plates use pygeoinf's flexure operator on the sphere (Sphere.flexural_operator and its inverse):
+
+    Op(w) = L(D L w) - L(D_eff) L w + tr(Hess D_eff Hess w) + 2 K grad D_eff . grad w - K D_eff L w + drho g w,
+
+with L the surface Laplacian, K = 1/R^2 the Gaussian curvature and D_eff = D (1 - nu). Our sphere spaces have
+radius 1 (components are orthonormal coefficients), so the rigidity is passed as D / R^4; with that scaling
+the operator is exactly the one on a sphere of radius R. For constant coefficients it is diagonal:
+
+    w_lm = F_l q_lm,   F_l = 1 / ( (D/R^4) [lam^2 - (1 - nu) lam] + drho g ),   lam = l(l+1),
+
+which differs from the flat-plate filter 1 / (D [l(l+1)/R^2]^2 + drho g) by the curvature term, at most a few
+parts in 10^5 for l <= 50 and T_e = 40 km.
 
 Two plates, built up in order
 -----------------------------
-ElasticPlate        constant drho = rho_LAB - rho_w (water everywhere). Diagonal in degree:
+ElasticPlate        constant drho = rho_LAB - rho_w (water everywhere): the diagonal filter above.
 
-                        w_lm = F_l q_lm,      F_l = 1 / (D [l(l+1)/R^2]^2 + drho g).
-
-OceanLoadedPlate    drho(x) from the ocean function, with fixed present-day coastlines. Writing
-                    drho(x) = (rho_LAB - rho_w) + rho_w (1 - C(x)), the equation is
-
-                        (diag(1/F_l) + g rho_w M) w = q,      M_ij = int (1 - C) Y_i Y_j dOmega,
-
-                    a symmetric positive-definite matrix coupling the degrees (land is stiffer). M is
-                    computed on a Gauss-Legendre grid, so it is exactly symmetric; the matrix is solved once.
-                    With C = 1 everywhere it is the ElasticPlate.
+OceanLoadedPlate    drho(x) from the ocean function, with fixed present-day coastlines, and optionally a
+                    laterally varying T_e(x). The operator is not diagonal: pygeoinf solves it matrix-free by
+                    conjugate gradients, preconditioned by the constant-coefficient filter. Because C(x) is
+                    a step at the coasts, the solve is done on a finer Gauss-Legendre grid (degree
+                    quad_lmax, 3 lmax by default), the load padded with zeros and the deflection
+                    truncated back to lmax. At 3 lmax the result is converged to about 1 %; on the model's own
+                    grid aliasing errors reach 20 % at coasts. With C = 1 it is the ElasticPlate.
 
 Both take rho_LAB, rho_w, g at the LAB and the surface radius R from step 1 (MantleFlow), so with T_e = 0 and
 water everywhere the plate gives back step 1's unflexed deflection exactly.
@@ -38,7 +44,7 @@ water everywhere the plate gives back step 1's unflexed deflection exactly.
 pygeoinf
 --------
 Domain: the load space of step 1 (a sphere Sobolev space, components = orthonormal coefficients in Pa).
-Codomain: a sphere Sobolev space for the deflection (components in m), with the same order and length scale.
+Codomain: the load space again by default (components then in m); pass another sphere space W to change it.
 
 Usage
 -----
@@ -47,6 +53,7 @@ Usage
     mf = MantleFlow(lmax=50)
     plate = ElasticPlate.from_mantle(mf, Te=40e3)           # water everywhere
     land_sea = OceanLoadedPlate.from_mantle(mf, Te=40e3)    # air on land
+    craton = OceanLoadedPlate.from_mantle(mf, Te=lambda lat, lon: ...)   # T_e(x) in m
     Q = mf.load_space()
     P = land_sea.operator(Q)                                # q (Pa) -> w (m)
     h_dyn = P @ mf.operator()                               # mantle density -> dynamic topography
@@ -54,15 +61,14 @@ Usage
 
 from __future__ import annotations
 
+from functools import lru_cache
 from importlib import resources
 
 import numpy as np
-import pyshtools as pysh
-import scipy.linalg as sla
-import scipy.sparse as sp
-from pygeoinf import LinearOperator
+from pygeoinf import CGSolver, LinearOperator
+from pygeoinf.symmetric_space import sphere
 
-from .examples import cilm_to_components, components_to_cilm, sphere_ordering
+CG_RTOL = 1e-10
 
 E_DEFAULT = 90e9  # Pa, as in Chapter 1
 NU_DEFAULT = 0.25
@@ -73,6 +79,7 @@ def rigidity(Te, E=E_DEFAULT, nu=NU_DEFAULT):
     return E * Te**3 / (12 * (1 - nu**2))
 
 
+@lru_cache(maxsize=4)
 def ocean_function(path=None):
     """The ocean function on its 1 degree grid: (lat centres, lon centres, C), lat from 89.5N down."""
     if path is None:
@@ -113,46 +120,60 @@ class ElasticPlate:
     def degrees(self):
         return np.arange(self.lmax + 1)
 
-    def bending(self):
-        """D [l(l+1)/R^2]^2 for l = 0..lmax, Pa per m."""
-        l = self.degrees()
-        return self.D * (l * (l + 1) / self.R**2) ** 2
-
     def filter(self):
-        """F_l = 1 / (D [l(l+1)/R^2]^2 + drho g), m per Pa, l = 0..lmax."""
-        return 1.0 / (self.bending() + self.drho * self.g)
+        """F_l, m per Pa, l = 0..lmax: pygeoinf's constant-coefficient symbol (see the module notes)."""
+        lam = self.degrees() * (self.degrees() + 1.0)
+        return 1.0 / (
+            self.D / self.R**4 * (lam**2 - (1 - self.nu) * lam) + self.drho * self.g
+        )
+
+    def flat_filter(self):
+        """The flat-plate filter 1 / (D [l(l+1)/R^2]^2 + drho g), for comparison."""
+        lam = self.degrees() * (self.degrees() + 1.0)
+        return 1.0 / (self.D * (lam / self.R**2) ** 2 + self.drho * self.g)
 
     def deflection_space(self, Q):
-        """A sphere space like the load space Q, for the deflection in m."""
-        return _like(Q)
-
-    def matrix(self, Q):
-        deg, _ = sphere_ordering(Q.lmax)
-        return sp.diags(self.filter()[deg])
+        """The deflection space: the load space itself (pygeoinf does not track units; components are in m)."""
+        return Q
 
     def operator(self, Q, W=None):
-        """The LinearOperator q (Pa) -> w (m), from the load space Q."""
-        W = W or self.deflection_space(Q)
-        return LinearOperator.from_matrix(Q, W, self.matrix(Q), form="components")
+        """The LinearOperator q (Pa) -> w (m), from the load space Q (a sphere space of radius 1)."""
+        _check_unit_sphere(Q)
+        F = Q.inverse_flexural_operator(self.D / self.R**4, self.nu, self.drho * self.g)
+        if W is not None and W != Q:
+            F = Q.degree_transfer_operator(W) @ F
+        return F
 
 
 class OceanLoadedPlate(ElasticPlate):
     """The same plate, with water filling the deflection in the oceans and air on land.
 
-    ``drho`` is the ocean value rho_LAB - rho_w; ``rho_water`` is what is missing on land. ``ocean`` is a
+    drho is the ocean value rho_LAB - rho_w; rho_water is what is missing on land. ocean is a
     function (lat, lon) -> C in degrees, by default the package's present-day ocean function; pass
-    ``lambda lat, lon: np.ones_like(lat)`` for water everywhere or zeros for air everywhere.
+    lambda lat, lon: np.ones_like(lat) for water everywhere or zeros for air everywhere. Te is a number
+    (m) or a vectorised function (lat, lon) -> T_e in m, both in degrees.
     """
 
     def __init__(
-        self, Te, drho, g, R, lmax, *, rho_water, ocean=None, quad_lmax=None, **kw
+        self,
+        Te,
+        drho,
+        g,
+        R,
+        lmax,
+        *,
+        rho_water,
+        ocean=None,
+        quad_lmax=None,
+        rtol=CG_RTOL,
+        **kw,
     ):
-        super().__init__(Te, drho, g, R, lmax, **kw)
+        self.Te_field = Te if callable(Te) else None
+        super().__init__(0.0 if callable(Te) else Te, drho, g, R, lmax, **kw)
         self.rho_water = float(rho_water)
         self.ocean = ocean or sample_ocean_function
         self.quad_lmax = int(quad_lmax or 3 * self.lmax)
-        self._K = None
-        self._inverse = None
+        self.rtol = float(rtol)
 
     @classmethod
     def from_mantle(cls, mf, Te=40e3, **kw):
@@ -168,51 +189,55 @@ class OceanLoadedPlate(ElasticPlate):
             **kw,
         )
 
-    def land_matrix(self):
-        """M_ij = int (1 - C) Y_i Y_j dOmega for the sphere components up to lmax (Gauss-Legendre quadrature)."""
-        L, Lq = self.lmax, self.quad_lmax
-        zero, w = pysh.expand.SHGLQ(Lq)
-        lat, lon = pysh.expand.GLQGridCoord(Lq)
+    def fine_space(self, Q):
+        """The Gauss-Legendre space the solve is done on: Q's Sobolev parameters at degree quad_lmax."""
+        if isinstance(Q, sphere.Sobolev):
+            return sphere.Sobolev(self.quad_lmax, Q.order, Q.length_scale, grid="GLQ")
+        return sphere.Lebesgue(self.quad_lmax, grid="GLQ")
+
+    def fields(self, H):
+        """(rigidity / R^4, buoyancy drho(x) g) on H's Gauss-Legendre grid."""
+        import pyshtools as pysh
+
+        lat, lon = pysh.expand.GLQGridCoord(H.lmax)
         LA, LO = np.meshgrid(lat, lon, indexing="ij")
-        land = 1.0 - self.ocean(LA, LO)
-        n = (L + 1) ** 2
-        M = np.empty((n, n))
+        if LA.shape != tuple(H.grid_shape):
+            raise ValueError("unexpected grid layout")
+        C = np.asarray(self.ocean(LA, LO), float)
+        buoyancy = self.g * (self.drho + self.rho_water * (1.0 - C))
+        if self.Te_field is None:
+            D = self.D
+        else:
+            D = rigidity(np.asarray(self.Te_field(LA, LO), float), self.E, self.nu)
+        return np.asarray(D) / self.R**4, buoyancy
+
+    def operator(self, Q, W=None):
+        """The LinearOperator q (Pa) -> w (m): pad to quad_lmax, solve the flexure there, truncate to W
+        (by default Q)."""
+        _check_unit_sphere(Q)
+        W = W or Q
+        H = self.fine_space(Q)
+        D, buoyancy = self.fields(H)
+        Finv = H.inverse_flexural_operator(
+            D, self.nu, buoyancy, solver=CGSolver(rtol=self.rtol)
+        )
+        return H.degree_transfer_operator(W) @ Finv @ Q.degree_transfer_operator(H)
+
+    def assembled(self, Q, W=None):
+        """The same operator as an explicit matrix (one solve per component), for repeated use."""
+        op = self.operator(Q, W)
+        n = Q.dim
+        M = np.empty((op.codomain.dim, n))
         e = np.zeros(n)
         for j in range(n):
             e[j] = 1.0
-            cilm = np.zeros((2, Lq + 1, Lq + 1))
-            cilm[:, : L + 1, : L + 1] = components_to_cilm(e, L)
-            grid = pysh.expand.MakeGridGLQ(cilm, zero, norm=4, csphase=1)
-            out = pysh.expand.SHExpandGLQ(
-                land * grid, w, zero, norm=4, csphase=1, lmax_calc=L
-            )
-            M[:, j] = cilm_to_components(out, L)
+            M[:, j] = op.codomain.to_components(op(Q.from_components(e)))
             e[j] = 0.0
-        return 0.5 * (M + M.T)  # symmetric to rounding already; remove the last bit
-
-    def system(self):
-        """K = diag(1/F_l) + g rho_w M: the plate equation K w = q."""
-        if self._K is None:
-            deg, _ = sphere_ordering(self.lmax)
-            self._K = (
-                np.diag(1.0 / super().filter()[deg])
-                + self.g * self.rho_water * self.land_matrix()
-            )
-        return self._K
-
-    def matrix(self, Q):
-        if Q.lmax != self.lmax:
-            raise ValueError("the load space must have the plate's lmax")
-        if self._inverse is None:
-            K = self.system()
-            self._inverse = sla.cho_solve(sla.cho_factor(K), np.eye(K.shape[0]))
-        return self._inverse
+        return LinearOperator.from_matrix(Q, op.codomain, M, form="components")
 
 
-def _like(Q):
-    """A new sphere space with the same type, lmax, radius and Sobolev parameters as Q."""
-    from pygeoinf.symmetric_space import sphere
-
-    if isinstance(Q, sphere.Sobolev):
-        return sphere.Sobolev(Q.lmax, Q.order, Q.length_scale, radius=Q.radius)
-    return sphere.Lebesgue(Q.lmax, radius=Q.radius)
+def _check_unit_sphere(Q):
+    if not np.isclose(Q.radius, 1.0):
+        raise ValueError(
+            "the plate expects sphere spaces of radius 1 (the rigidity is scaled by R^4)"
+        )
