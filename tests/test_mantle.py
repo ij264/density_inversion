@@ -50,6 +50,16 @@ def test_adjoint(ops):
         assert abs(lhs - rhs) <= 1e-10 * max(abs(lhs), 1.0)
 
 
+def test_spaces_are_sobolev(ops):
+    """Both the density space and the load space are Sobolev spaces."""
+    from pygeoinf.ball.space import Sobolev as BallSobolev
+    from pygeoinf.symmetric_space import sphere
+
+    X, A = ops
+    assert isinstance(A.codomain, sphere.Sobolev)
+    assert all(isinstance(ball, BallSobolev) for ball in X.layers)
+
+
 def test_dense_anomaly_pulls_plate_down(mf):
     """A dense anomaly anywhere in the mantle gives a negative load (the plate is pulled down), at every degree."""
     K = mf.kernels["K_q"][:, 1:-1]  # the boundary nodes carry no load

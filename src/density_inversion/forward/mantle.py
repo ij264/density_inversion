@@ -24,8 +24,8 @@ pygeoinf
 --------
 Model space: drho_m on a layered Sobolev ball (pygeoinf.ball.Layered) from the CMB to the LAB sphere, split at
 the viscosity jump so density may jump there (density_inversion.operators.density_space). Codomain: a sphere
-space whose components are the orthonormal coefficients of q in Pa (sphere.Lebesgue, radius 1). The operator
-is block-diagonal in degree.
+space whose components are the orthonormal coefficients of q in Pa (sphere.Sobolev, radius 1, order 2 and
+length scale 0.05 R by default). Both spaces are Sobolev. The operator is block-diagonal in degree.
 
 Usage
 -----
@@ -220,11 +220,14 @@ class MantleFlow:
             **options,
         )
 
-    def load_space(self):
-        """q on the sphere: components are orthonormal coefficients in Pa."""
+    def load_space(self, *, order=2.0, length_scale=0.05):
+        """q on the sphere, a Sobolev space H^order with the metric (1 + length_scale^2 l(l+1))^order
+        (radius 1, length_scale in units of R). Components are the orthonormal coefficients in Pa,
+        whatever the order: the order changes the inner product (and so the adjoint), not the vectors.
+        """
         from pygeoinf.symmetric_space import sphere
 
-        return sphere.Lebesgue(self.lmax)
+        return sphere.Sobolev(self.lmax, order, length_scale)
 
     def operator(self, X=None, Q=None):
         """The LinearOperator drho_m -> q."""
