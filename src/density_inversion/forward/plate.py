@@ -83,7 +83,9 @@ def rigidity(Te, E=E_DEFAULT, nu=NU_DEFAULT):
 def ocean_function(path=None):
     """The ocean function on its 1 degree grid: (lat centres, lon centres, C), lat from 89.5N down."""
     if path is None:
-        path = resources.files("density_inversion") / "data" / "ocean_function.csv"
+        path = (
+            resources.files("density_inversion") / "data" / "ocean_function.csv"
+        )
     C = np.loadtxt(path, delimiter=",")
     return 89.5 - np.arange(C.shape[0]), 0.5 + np.arange(C.shape[1]), C
 
@@ -124,7 +126,8 @@ class ElasticPlate:
         """F_l, m per Pa, l = 0..lmax: pygeoinf's constant-coefficient symbol (see the module notes)."""
         lam = self.degrees() * (self.degrees() + 1.0)
         return 1.0 / (
-            self.D / self.R**4 * (lam**2 - (1 - self.nu) * lam) + self.drho * self.g
+            self.D / self.R**4 * (lam**2 - (1 - self.nu) * lam)
+            + self.drho * self.g
         )
 
     def flat_filter(self):
@@ -139,7 +142,9 @@ class ElasticPlate:
     def operator(self, Q, W=None):
         """The LinearOperator q (Pa) -> w (m), from the load space Q (a sphere space of radius 1)."""
         _check_unit_sphere(Q)
-        F = Q.inverse_flexural_operator(self.D / self.R**4, self.nu, self.drho * self.g)
+        F = Q.inverse_flexural_operator(
+            self.D / self.R**4, self.nu, self.drho * self.g
+        )
         if W is not None and W != Q:
             F = Q.degree_transfer_operator(W) @ F
         return F
@@ -192,7 +197,9 @@ class OceanLoadedPlate(ElasticPlate):
     def fine_space(self, Q):
         """The Gauss-Legendre space the solve is done on: Q's Sobolev parameters at degree quad_lmax."""
         if isinstance(Q, sphere.Sobolev):
-            return sphere.Sobolev(self.quad_lmax, Q.order, Q.length_scale, grid="GLQ")
+            return sphere.Sobolev(
+                self.quad_lmax, Q.order, Q.length_scale, grid="GLQ"
+            )
         return sphere.Lebesgue(self.quad_lmax, grid="GLQ")
 
     def fields(self, H):
@@ -208,7 +215,9 @@ class OceanLoadedPlate(ElasticPlate):
         if self.Te_field is None:
             D = self.D
         else:
-            D = rigidity(np.asarray(self.Te_field(LA, LO), float), self.E, self.nu)
+            D = rigidity(
+                np.asarray(self.Te_field(LA, LO), float), self.E, self.nu
+            )
         return np.asarray(D) / self.R**4, buoyancy
 
     def operator(self, Q, W=None):
@@ -221,7 +230,9 @@ class OceanLoadedPlate(ElasticPlate):
         Finv = H.inverse_flexural_operator(
             D, self.nu, buoyancy, solver=CGSolver(rtol=self.rtol)
         )
-        return H.degree_transfer_operator(W) @ Finv @ Q.degree_transfer_operator(H)
+        return (
+            H.degree_transfer_operator(W) @ Finv @ Q.degree_transfer_operator(H)
+        )
 
     def assembled(self, Q, W=None):
         """The same operator as an explicit matrix (one solve per component), for repeated use."""

@@ -1,6 +1,7 @@
 # generated: rerun the scripts to recreate them
 figures/output/
 *.npz
+!src/density_inversion/data/*.npz
 *.npy
 __pycache__/
 *.pyc

@@ -56,14 +56,17 @@ P_water, P_land_sea = water.operator(Q), land_sea.operator(Q)
 apply = lambda op, c: op.codomain.to_components(op(op.domain.from_components(c)))
 
 
-def maps(name, fields, title):
-    """Three maps side by side, each with its own symmetric colour scale."""
+def maps(name, fields, title, shared=()):
+    """Three maps side by side. Panels listed in `shared` (the same quantity) get one common symmetric
+    colour scale; the others each get their own."""
     lat, lon, _ = ex.to_grid(fields[0][0], L)
     LO, LA = np.meshgrid(lon, lat)
+    grids = [ex.to_grid(comp, L)[2] for comp, _ in fields]
+    common = max((np.max(np.abs(grids[i])) for i in shared), default=None)
     fig = plt.figure(figsize=(13.0, 2.9))
     for i, (comp, lab) in enumerate(fields):
-        F = ex.to_grid(comp, L)[2]
-        v = np.max(np.abs(F))
+        F = grids[i]
+        v = common if i in shared else np.max(np.abs(F))
         ax = fig.add_subplot(
             1, 3, i + 1, projection=ccrs.Robinson(central_longitude=150)
         )
@@ -177,9 +180,10 @@ for name, profiles in cases:
         [
             (h0 / 1e3, "Unflexed deflection (km)"),
             (hw / 1e3, rf"Flexed, $T_e = {TE / 1e3:g}$ km, water everywhere (km)"),
-            ((hw - h0), "Flexed minus unflexed (m)"),
+            ((hw - h0) / 1e3, "Flexed minus unflexed (km)"),
         ],
         label,
+        shared=(0, 1, 2),
     )
     maps(
         f"land_sea_{name}",
@@ -189,6 +193,7 @@ for name, profiles in cases:
             ((hl - hw) / 1e3, "Land/sea minus water everywhere (km)"),
         ],
         label + rf", $T_e = {TE / 1e3:g}$ km",
+        shared=(0, 1, 2),
     )
     print(
         f"{name}: RMS unflexed {rms(h0) / 1e3:.3f} km, flexed {rms(hw) / 1e3:.3f} km "
@@ -210,6 +215,7 @@ maps(
         (b - a, "Difference (m)"),
     ],
     "A uniform upward load of 1 MPa, no plate",
+    shared=(0, 1, 2),
 )
 rho, rw = float(k["rho_lab"]), float(k["rho_water"])
 print(

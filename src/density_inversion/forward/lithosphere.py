@@ -196,3 +196,195 @@ class Lithosphere:
 
     def index(self, label):
         return [s[0] for s in self.summands()].index(label)
+
+
+# ===================================================================================== 3c and 3d: WINTERC-G
+#
+# The reference lithosphere is WINTERC-G v5.4 (Fullea et al. 2021), built into data/reference_lithosphere.npz
+# by scripts/make_reference_lithosphere.py. It has one crustal layer (bedrock to Moho, one density per column)
+# and mantle densities at fixed depths. Step 3 owns the column from the surface to the flow top of step 1
+# (a sphere T = 105 km down); everything below is step 1's. So the layers are
+#
+#     crust        surface to Moho(x)          thickness t_c(x) = Moho depth + bedrock elevation
+#     mantle lid   Moho(x) to T below the      thickness t_l(x) = T - t_c(x), GLL nodes across it
+#                  surface
+#
+# and the perturbed interfaces are the Moho (contrast rho_lid_top(x) - rho_crust(x)) and WINTERC-G's LAB
+# (its density jump drho_lab(x), about 8 kg/m^3 on average), the LAB a mass sheet at its own depth even where it
+# lies below T (first order). Columns are measured from their own surface, as the plate sees them; depths
+# into WINTERC-G's density tables are depths below sea level, d = z - bedrock elevation.
+#
+# 3c: each perturbation's load is a field times the perturbation, -g f(x) u(x), a multiplication on the sphere.
+#     It is done on a Gauss-Legendre grid at quad_lmax (3 lmax by default) and truncated, as the plate does.
+# 3d: the reference structure's own load, q_ref = -g (M(x) - mean M), M the column mass to T plus the ice.
+
+
+def reference_data(path=None):
+    """The reference lithosphere fields (see scripts/make_reference_lithosphere.py)."""
+    from importlib import resources
+
+    if path is None:
+        path = (
+            resources.files("density_inversion") / "data" / "reference_lithosphere.npz"
+        )
+    with np.load(path) as d:
+        return {k: d[k] for k in d.files}
+
+
+class ReferenceLithosphere:
+    """Laterally varying lithosphere from WINTERC-G: perturbation operators (3c) and the reference load (3d)."""
+
+    RHO_ICE = 910.0
+
+    def __init__(
+        self, g, R, lmax, flow_top_depth, *, lid_nodes=3, quad_lmax=None, data=None
+    ):
+        self.g, self.R, self.lmax = float(g), float(R), int(lmax)
+        self.T = float(flow_top_depth)
+        self.lid_nodes = int(lid_nodes)
+        self.quad_lmax = int(quad_lmax or 3 * self.lmax)
+        self.data = data or reference_data()
+
+    @classmethod
+    def from_mantle(cls, mf, **kw):
+        k = mf.kernels
+        return cls(
+            float(k["g_lab"]),
+            float(k["R"]),
+            mf.lmax,
+            float(k["R"]) - float(k["r_lab"]),
+            **kw,
+        )
+
+    # ---------------------------------------------------------------- fields at points
+    def sample(self, name, lat, lon):
+        """A 2-D field at points (degrees), by the 1 degree cell each point falls in."""
+        f = self.data[name]
+        i = np.clip(np.floor(90.0 - np.asarray(lat)).astype(int), 0, 179)
+        j = np.floor(np.mod(np.asarray(lon), 360.0)).astype(int) % 360
+        return np.asarray(f[..., i, j], float)
+
+    def mantle_density(self, depth, lat, lon):
+        """WINTERC-G mantle density at depth below sea level (m), linear between its knots, per column."""
+        knots = self.sample("mantle_depths", lat, lon)  # (6, ...)
+        rho = self.sample("rho_mantle", lat, lon)
+        depth = np.broadcast_to(np.asarray(depth, float), knots.shape[1:])
+        out = np.where(depth <= knots[0], rho[0], rho[-1])
+        for k in range(knots.shape[0] - 1):
+            a, b = knots[k], knots[k + 1]
+            inside = (depth > a) & (depth <= b) & (b > a)
+            frac = np.where(b > a, (depth - a) / np.where(b > a, b - a, 1.0), 0.0)
+            out = np.where(inside, rho[k] + frac * (rho[k + 1] - rho[k]), out)
+        return out
+
+    def structure(self, lat, lon):
+        """Thicknesses, contrasts and node weights at points: a dict of arrays."""
+        bed = self.sample("bed_elevation", lat, lon)
+        moho = self.sample("moho_depth", lat, lon)
+        t_c = moho + bed
+        t_l = self.T - t_c
+        if np.any(t_l <= 0):
+            raise ValueError("the crust reaches the flow top somewhere")
+        rho_c = self.sample("rho_crust", lat, lon)
+        rho_top = self.sample("rho_mantle", lat, lon)[0]
+        x, w = gll(self.lid_nodes)
+        return dict(
+            bed=bed,
+            moho=moho,
+            t_c=t_c,
+            t_l=t_l,
+            rho_c=rho_c,
+            drho_moho=rho_top - rho_c,
+            drho_lab=self.sample("drho_lab", lat, lon),
+            lab=self.sample("lab_depth", lat, lon),
+            node_weights=[t_l / 2 * wn for wn in w],
+            node_depths=[moho + t_l / 2 * (1 + xn) for xn in x],  # below sea level
+        )
+
+    def column_mass(self, lat, lon, n_quad=40):
+        """Mass per unit area from the surface to T below it, plus the ice (kg/m^2)."""
+        s = self.structure(lat, lon)
+        xg, wg = np.polynomial.legendre.leggauss(n_quad)
+        lid = np.zeros_like(s["t_l"])
+        for xq, wq in zip(xg, wg):
+            z = s["t_c"] + s["t_l"] / 2 * (1 + xq)  # depth below the surface
+            lid += wq * s["t_l"] / 2 * self.mantle_density(z - s["bed"], lat, lon)
+        ice = self.RHO_ICE * self.sample("ice_thickness", lat, lon)
+        return s["rho_c"] * s["t_c"] + lid + ice
+
+    # ---------------------------------------------------------------- pygeoinf
+    def _fine(self, Q):
+        from pygeoinf.symmetric_space import sphere
+
+        if isinstance(Q, sphere.Sobolev):
+            return sphere.Sobolev(self.quad_lmax, Q.order, Q.length_scale, grid="GLQ")
+        return sphere.Lebesgue(self.quad_lmax, grid="GLQ")
+
+    def _grid(self, H):
+        import pyshtools as pysh
+
+        lat, lon = pysh.expand.GLQGridCoord(H.lmax)
+        LA, LO = np.meshgrid(lat, lon, indexing="ij")
+        if LA.shape != tuple(H.grid_shape):
+            raise ValueError("unexpected grid layout")
+        return LA, LO
+
+    def summands(self):
+        """[(label, kind, field name)]: dMoho, dLAB, the crust's density, the lid's nodes."""
+        out = [
+            ("dMoho", "interface", "drho_moho"),
+            ("dLAB", "interface", "drho_lab"),
+            ("drho crust", "layer", "t_c"),
+        ]
+        out += [
+            (f"drho lid node {n}", "layer", ("node_weights", n))
+            for n in range(self.lid_nodes)
+        ]
+        return out
+
+    def factor_fields(self, lat, lon):
+        """The field f(x) of each summand (kg/m^2 per unit of the summand), in summand order."""
+        s = self.structure(lat, lon)
+        out = []
+        for _, _, key in self.summands():
+            out.append(s[key[0]][key[1]] if isinstance(key, tuple) else s[key])
+        return out
+
+    def operator(self, Q):
+        """(dMoho, dLAB, drho crust, drho lid nodes) -> q (Pa): a RowLinearOperator of multiplications."""
+        if not np.isclose(Q.radius, 1.0):
+            raise ValueError("expected a sphere space of radius 1")
+        H = self._fine(Q)
+        up, down = Q.degree_transfer_operator(H), H.degree_transfer_operator(Q)
+        fields = self.factor_fields(*self._grid(H))
+        return RowLinearOperator(
+            [down @ H.multiplication_operator(-self.g * f) @ up for f in fields]
+        )
+
+    def space(self, Q):
+        from pygeoinf import DirectSum
+
+        return DirectSum(
+            [Q] * len(self.summands()), labels=[s[0] for s in self.summands()]
+        )
+
+    def index(self, label):
+        return [s[0] for s in self.summands()].index(label)
+
+    def reference_load(self, Q):
+        """3d: q_ref = -g (M - mean M), the load of the reference structure itself, as components of Q (Pa)."""
+        return self._analyse(
+            Q, lambda LA, LO: -self.g * self.column_mass(LA, LO), zero_mean=True
+        )
+
+    def field(self, Q, name):
+        """A stored 2-D field, or 'bed_elevation' etc., as components of Q (degree <= Q.lmax)."""
+        return self._analyse(Q, lambda LA, LO: self.sample(name, LA, LO))
+
+    def _analyse(self, Q, f, zero_mean=False):
+        H = self._fine(Q)
+        values = f(*self._grid(H))
+        comp = H.to_components(H.from_grid_values(values))[: Q.dim].copy()
+        if zero_mean:
+            comp[0] = 0.0
+        return comp

@@ -128,3 +128,105 @@ def test_airy_isostasy_with_no_plate(mf):
     rho_c = 2900.0
     assert h > 0
     assert h / (r - h) == pytest.approx((rho_m - rho_c) / rho_c, rel=1e-12)
+
+
+# ------------------------------------------------------------------ 3c and 3d: WINTERC-G reference
+
+from density_inversion.forward.lithosphere import ReferenceLithosphere  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def ref(mf):
+    return ReferenceLithosphere.from_mantle(mf)
+
+
+@pytest.fixture(scope="module")
+def ref_op(mf, ref):
+    Q = mf.load_space()
+    return Q, ref.operator(Q)
+
+
+def ref_load(ref, Q, op, fields):
+    x = np.zeros(op.domain.dim)
+    for label, comp in fields.items():
+        i = ref.index(label)
+        x[i * Q.dim : (i + 1) * Q.dim] = comp
+    return Q.to_components(op(op.domain.from_components(x)))
+
+
+def test_reference_structure_is_sensible(ref):
+    lat, lon = np.array([32.0, 0.0, -75.0]), np.array(
+        [88.0, 200.0, 0.0]
+    )  # Tibet, Pacific, Antarctica
+    s = ref.structure(lat, lon)
+    assert (
+        s["t_c"][0] > 60e3 and s["t_c"][1] < 12e3
+    )  # thick Tibetan crust, thin oceanic crust
+    assert np.all(s["t_l"] > 0) and np.all(s["drho_moho"] > 300)
+    assert np.allclose(sum(s["node_weights"]), s["t_l"])
+    assert ref.sample("ice_thickness", lat, lon)[2] > 1e3  # Antarctic ice
+
+
+def test_uniform_crustal_density_gives_minus_g_thickness(ref, ref_op):
+    """10 kg/m^3 added to the crust everywhere: q = -g t_c(x) 10, projected onto degree <= lmax."""
+    Q, op = ref_op
+    c = np.zeros(Q.dim)
+    c[0] = 10.0 * np.sqrt(4 * np.pi)
+    q = ref_load(ref, Q, op, {"drho crust": c})
+    expect = ref._analyse(
+        Q, lambda LA, LO: -ref.g * 10.0 * ref.structure(LA, LO)["t_c"]
+    )
+    assert np.allclose(q, expect, rtol=1e-10, atol=1e-10 * np.abs(expect).max())
+
+
+def test_uniform_moho_raise_gives_minus_g_contrast(ref, ref_op):
+    Q, op = ref_op
+    c = np.zeros(Q.dim)
+    c[0] = 1e3 * np.sqrt(4 * np.pi)
+    q = ref_load(ref, Q, op, {"dMoho": c})
+    expect = ref._analyse(
+        Q, lambda LA, LO: -ref.g * 1e3 * ref.structure(LA, LO)["drho_moho"]
+    )
+    assert np.allclose(q, expect, rtol=1e-10, atol=1e-10 * np.abs(expect).max())
+
+
+def test_reference_operator_adjoint(ref_op):
+    Q, op = ref_op
+    rng = np.random.default_rng(3)
+    x = op.domain.from_components(rng.standard_normal(op.domain.dim))
+    y = Q.from_components(rng.standard_normal(Q.dim))
+    lhs, rhs = Q.inner_product(op(x), y), op.domain.inner_product(x, op.adjoint(y))
+    assert abs(lhs - rhs) <= 1e-10 * abs(lhs)
+
+
+def test_column_mass_by_brute_force(ref):
+    """The Gauss quadrature of the lid against a fine trapezoid down one column (central Asia)."""
+    lat, lon = np.array([45.0]), np.array([90.0])
+    s = ref.structure(lat, lon)
+    z = np.linspace(s["t_c"][0], ref.T, 20001)
+    rho = ref.mantle_density(
+        z - s["bed"][0], np.full(z.size, 45.0), np.full(z.size, 90.0)
+    )
+    lid = np.sum(0.5 * (rho[1:] + rho[:-1]) * np.diff(z))
+    brute = (
+        s["rho_c"][0] * s["t_c"][0]
+        + lid
+        + 910.0 * ref.sample("ice_thickness", lat, lon)[0]
+    )
+    assert ref.column_mass(lat, lon)[0] == pytest.approx(brute, rel=1e-6)
+
+
+def test_reference_load_lifts_thick_crust_and_sinks_oceans(mf, ref):
+    """q_ref has zero mean, pushes up under Tibet (thick light crust) and down under the Pacific."""
+    Q = mf.load_space()
+    q = ref.reference_load(Q)
+    assert q[0] == 0.0
+    lat, lon, g = ex_grid(q)
+    at = lambda la, lo: g[np.argmin(abs(lat - la)), np.argmin(abs(lon - lo))]
+    assert at(32, 88) > 0 and at(0, 200) < 0
+
+
+def ex_grid(comp):
+    from density_inversion.forward import examples as ex
+
+    return ex.to_grid(comp, LMAX)

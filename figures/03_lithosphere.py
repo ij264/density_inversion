@@ -4,6 +4,10 @@
   nodes.pdf        (a) the layers and their GLL nodes; (b) the Lagrange functions across the lithospheric mantle
   moho_root.pdf    a 10 km crustal root under Tibet: the Moho perturbation, topography with no plate, with
                    Te = 40 km (both with water at sea and air on land)
+  reference_structure.pdf   WINTERC-G (3c): crustal thickness, the Moho contrast, the LAB density jump
+  reference_topography.pdf  3d: observed bedrock elevation, the topography the reference lithosphere predicts
+                   (Te = 40 km, land and sea), and their difference (degrees 1-50)
+  reference_spectra.pdf     the same three by degree, and the correlation of observed and predicted
   craton.pdf       a depleted cratonic root under the Canadian Shield, -30 kg/m^3 at the Moho tapering to 0 at
                    the LAB: the anomaly at the top node, the load, the topography with Te = 40 km
 Written to figures/output/03_lithosphere/.
@@ -29,6 +33,7 @@ from figstyle import INK, MUTED, BLUE, ORANGE, AQUA  # noqa: E402
 from density_inversion.forward import examples as ex  # noqa: E402
 from density_inversion.forward.lithosphere import (
     Lithosphere,
+    ReferenceLithosphere,
     lagrange,
     gll,
 )  # noqa: E402
@@ -72,13 +77,17 @@ def model_vector(fields):
     return x
 
 
-def maps(name, fields, title, centre=150):
+def maps(name, fields, title, centre=150, shared=()):
+    """Three maps side by side. Panels listed in `shared` (the same quantity) get one common symmetric
+    colour scale; the others each get their own."""
     lat, lon, _ = ex.to_grid(fields[0][0], L)
     LO, LA = np.meshgrid(lon, lat)
+    grids = [ex.to_grid(comp, L)[2] for comp, _ in fields]
+    common = max((np.max(np.abs(grids[i])) for i in shared), default=None)
     fig = plt.figure(figsize=(13.0, 2.9))
     for i, (comp, lab) in enumerate(fields):
-        F = ex.to_grid(comp, L)[2]
-        v = np.max(np.abs(F))
+        F = grids[i]
+        v = common if i in shared else np.max(np.abs(F))
         ax = fig.add_subplot(
             1, 3, i + 1, projection=ccrs.Robinson(central_longitude=centre)
         )
@@ -177,6 +186,7 @@ maps(
     ],
     "A 10 km crustal root under Tibet (Gaussian, width 400 km); water at sea, air on land",
     centre=90,
+    shared=(1, 2),
 )
 _, drho_moho = lith.interface("base of lower crust")
 print(
@@ -212,5 +222,102 @@ maps(
 print(
     f"craton: peak load {peak(q) / 1e6:.2f} MPa, peak topography {peak(h40):.0f} m "
     f"(column mass {-30 * (bottom - top) / 2:.3g} kg/m^2)"
+)
+# ---------------------------------------------------------------- WINTERC-G reference (3c, 3d)
+ref = ReferenceLithosphere.from_mantle(mf)
+glat, glon = 89.5 - np.arange(180), 0.5 + np.arange(360)
+GLA, GLO = np.meshgrid(glat, glon, indexing="ij")
+s = ref.structure(GLA, GLO)
+panels = [
+    (s["t_c"] / 1e3, "Crustal thickness (km)", "viridis", None),
+    (
+        s["drho_moho"],
+        r"Moho contrast $\rho_{\mathrm{lid}} - \rho_c$ ($\mathrm{kg\,m^{-3}}$)",
+        "viridis",
+        None,
+    ),
+    (s["drho_lab"], r"LAB density jump ($\mathrm{kg\,m^{-3}}$)", "RdBu_r", "sym"),
+]
+fig = plt.figure(figsize=(13.0, 2.9))
+for i, (F, lab, cmap, mode) in enumerate(panels):
+    ax = fig.add_subplot(1, 3, i + 1, projection=ccrs.Robinson(central_longitude=150))
+    if mode == "sym":
+        v = np.percentile(np.abs(F), 99)
+        lims = dict(vmin=-v, vmax=v)
+    else:
+        lims = dict(vmin=np.percentile(F, 1), vmax=np.percentile(F, 99))
+    im = ax.pcolormesh(
+        GLO,
+        GLA,
+        F,
+        transform=ccrs.PlateCarree(),
+        cmap=cmap,
+        shading="auto",
+        rasterized=True,
+        **lims,
+    )
+    ax.coastlines(lw=0.4, color=INK)
+    ax.set_global()
+    cb = fig.colorbar(
+        im, ax=ax, orientation="horizontal", shrink=0.8, pad=0.04, aspect=30
+    )
+    cb.set_label(lab, fontsize=9)
+    ax.set_title(f"({'abc'[i]})", loc="left", fontsize=10)
+fig.suptitle("WINTERC-G reference lithosphere", fontsize=9, color=MUTED)
+fig.savefig(OUT / "reference_structure.pdf")
+fig.savefig(OUT / "reference_structure.png")
+plt.close(fig)
+
+q_ref = ref.reference_load(Q)
+h_pred = apply(plates[40e3], q_ref)
+h_obs = ref.field(Q, "bed_elevation")
+h_obs[0] = h_pred[0] = 0.0  # the mean level is arbitrary; compare degrees >= 1
+resid = h_obs - h_pred
+maps(
+    "reference_topography",
+    [
+        (h_obs / 1e3, "Observed bedrock elevation (km)"),
+        (h_pred / 1e3, r"Predicted by the reference lithosphere, $T_e = 40$ km (km)"),
+        (resid / 1e3, "Observed minus predicted (km)"),
+    ],
+    "Degrees 1-50; water at sea, air on land, ice as a load",
+    shared=(0, 1, 2),
+)
+deg, _ = ex.sphere_ordering(L)
+power = lambda c: np.array([np.sum(c[deg == l] ** 2) for l in range(1, L + 1)])
+corr = np.array(
+    [
+        np.sum(h_obs[deg == l] * h_pred[deg == l])
+        / np.sqrt(np.sum(h_obs[deg == l] ** 2) * np.sum(h_pred[deg == l] ** 2))
+        for l in range(1, L + 1)
+    ]
+)
+ls = np.arange(1, L + 1)
+fig, axs = plt.subplots(1, 2, figsize=(9.0, 3.4))
+for c, lab, col in (
+    (h_obs, "observed", INK),
+    (h_pred, "predicted", BLUE),
+    (resid, "observed - predicted", ORANGE),
+):
+    axs[0].semilogy(ls, np.sqrt(power(c)) / 1e3, color=col, label=lab)
+axs[0].set_xlabel(r"Degree $\ell$")
+axs[0].set_ylabel("Amplitude per degree (km)")
+axs[0].legend(fontsize=8)
+axs[1].plot(ls, corr, color=BLUE)
+axs[1].axhline(0, color=MUTED, lw=0.6)
+axs[1].set_ylim(-0.2, 1.0)
+axs[1].set_xlabel(r"Degree $\ell$")
+axs[1].set_ylabel("Correlation, observed and predicted")
+for ax, tl in zip(axs, "ab"):
+    ax.set_title(f"({tl})", loc="left", fontsize=10)
+fig.savefig(OUT / "reference_spectra.pdf")
+fig.savefig(OUT / "reference_spectra.png")
+plt.close(fig)
+rms = lambda c: np.sqrt(np.sum(c[1:] ** 2) / (4 * np.pi))
+print(
+    f"reference: q_ref RMS {rms(q_ref) / 1e6:.1f} MPa; topography RMS observed {rms(h_obs) / 1e3:.2f} km, "
+    f"predicted {rms(h_pred) / 1e3:.2f} km, residual {rms(resid) / 1e3:.2f} km "
+    f"(variance reduction {1 - rms(resid) ** 2 / rms(h_obs) ** 2:.2f}); correlation at l = 1-5: "
+    f"{np.round(corr[:5], 2)}"
 )
 print("saved to", OUT)
