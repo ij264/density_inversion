@@ -12,7 +12,7 @@ step as pygeoinf operators, each step with its own tests and figures.
 | 2. Elastic plate: load -> deflection, water at sea and air on land | `forward/plate.py` | done |
 | 3. Lithospheric loads: placeholder layers (3a, 3b); WINTERC-G reference lithosphere and its load (3c, 3d) | `forward/lithosphere.py` | done |
 | 4. Surface field h_s | | next |
-| 5. Geoid | | |
+| 5. Geoid: mantle part, lithospheric sheets, the deflected plate, the reference lithosphere | `forward/geoid.py` | done |
 | 6. Total and dynamic topography | | |
 
 ## Layout
@@ -22,6 +22,7 @@ step as pygeoinf operators, each step with its own tests and figures.
         forward/mantle.py       step 1: MantleFlow, the kernels from flowkernels and the operator drho_m -> q
         forward/plate.py        step 2: ElasticPlate (water everywhere), OceanLoadedPlate (land and sea)
         forward/lithosphere.py  step 3: layer densities (nodal in depth, GLL) and interfaces -> load
+        forward/geoid.py        step 5: Geoid (mantle, lithosphere, deflection and reference parts)
         forward/examples.py     example density fields (a dense blob, a 1/k random field); read no files
         data/reference_model.csv  radial reference model (PREM densities, 257 nodes)
         data/ocean_function.csv   present-day ocean function, 1 degree
@@ -43,6 +44,7 @@ flowkernels is private, so install it first from its own clone, then this packag
     python figures/01_mantle_flow.py           # kernels, two examples (and the fem_1d check, if set)
     python figures/02_plate.py                 # flexural filter, ocean function, flexed and land/sea examples
     python figures/03_lithosphere.py           # layers and nodes, a crustal root, a craton, the WINTERC-G reference
+    python figures/05_geoid.py                 # geoid kernels, the blob, the reference lithosphere, compensation, spectra
     python figures/schematic.py                # the slide schematic of the Earth model
 
 Kernels are cached in `~/.cache/density_inversion` (set `DENSITY_INVERSION_CACHE` to change it). The cache

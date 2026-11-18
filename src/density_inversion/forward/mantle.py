@@ -141,6 +141,7 @@ class MantleFlow:
                     self.shell.compressible,
                     self.shell.layer_quadrature,
                     fk.__version__,
+                    "geoid-v1",
                 ]
             ).encode()
         )
@@ -155,6 +156,12 @@ class MantleFlow:
         r, n = s.r, s.n
         K_q = np.empty((degrees.size, n))
         K_h0 = np.empty((degrees.size, n))
+        K_N = np.empty((degrees.size, n))
+        K_N_fk = np.empty((degrees.size, n))
+        K_m_top = np.empty((degrees.size, n))
+        g_top, r_top = s.gravity[-1], r[-1]
+        g0 = c.G * c.earth_mass / self.R**2
+        geo_pref = c.visc_ref / (c.rho_ref * r_top * g_top)
         for j, l in enumerate(degrees):
             u_theta, sig_top, phi_top, sig_bot, phi_bot = fk.solve_degree_traces(
                 s, int(l)
@@ -163,6 +170,23 @@ class MantleFlow:
                 -c.visc_ref / r[-1] * (sig_top + (c.rho_water / c.rho_ref) * phi_top)
             )
             K_h0[j] = K_q[j] / ((s.rho[-1] - c.rho_water) * s.gravity[-1])
+            # geoid. flowkernels' surface-potential row is PHI + c_top sigma_rr + (CMB terms) = (attraction of
+            # the anomaly): the c_top term is the self-gravity of the deflected top boundary. Removing it leaves
+            # the potential of the anomaly and of the deflected CMB alone; the plate's deflection is added
+            # separately (forward/geoid.py), with the masses where the plate puts them. Continued from the top
+            # of the shell to the surface as r^-(l+1), referred to surface gravity g0. Degree 1: zero (the
+            # centre-of-mass frame).
+            c_top = 4 * np.pi * c.G / (2 * l + 1) * r_top / g_top * c.rho_ref
+            K_N_fk[j] = (
+                geo_pref * phi_top
+            )  # flowkernels' own geoid at the top of the shell
+            K_m_top[j] = (
+                -c.visc_ref / r_top * sig_top / g_top
+            )  # mass of its deflected top, kg/m^2
+            internal = geo_pref * (phi_top + c_top * sig_top)
+            K_N[j] = (
+                0.0 if l == 1 else internal * (g_top / g0) * (r_top / self.R) ** (l + 1)
+            )
         # trapezoid weights, split at the viscosity jump so each side of a density discontinuity is integrated
         # over its own layer: the node on the jump is listed twice (lower copy, then an upper copy nudged up)
         eta = s.viscosity(1)
@@ -186,7 +210,11 @@ class MantleFlow:
             weights=w,
             K_q=K_q[:, idx],
             K_h0=K_h0[:, idx],
+            K_N=K_N[:, idx],
+            K_N_fk=K_N_fk[:, idx],
+            K_m_top=K_m_top[:, idx],
             R=np.float64(self.R),
+            g0=np.float64(g0),
             r_cmb=np.float64(r[0]),
             r_jump=np.float64(r[i_jump]),
             r_lab=np.float64(r[-1]),
@@ -197,6 +225,9 @@ class MantleFlow:
             notes=np.array(
                 "q_lm = sum(weights * K_q[l] * drho_lm(r)) [Pa], positive up; "
                 "K_h0 = K_q / ((rho_lab - rho_water) g_lab) [m per kg/m^3 per m]; "
+                "K_N: geoid at the surface of the anomaly and the deflected CMB, without the top's deflection [m]; "
+                "K_N_fk: flowkernels' geoid at the top of the shell, deflected top included; "
+                "K_m_top: mass of that deflected top [kg/m^2]; "
                 "see forward/mantle.py"
             ),
         )
