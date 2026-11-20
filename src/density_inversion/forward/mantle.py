@@ -9,16 +9,21 @@ LAB sphere as the top of its shell. The load on the plate, positive upwards, is
 
     q_lm = int_{r_cmb}^{r_LAB} K^q_l(r) drho_m,lm(r) dr          [Pa],
 
-    K^q_l(r) = -(eta_ref / r_LAB) (sigma_rr + (rho_w / rho_ref) PHI)   at the top of the shell,
+    K^q_l(r) = -(eta_ref / r_LAB) sigma_rr   at the top of the shell,
 
-with sigma_rr and PHI the non-dimensional traces of flowkernels (stress positive in tension, physics-sign
-potential). The PHI term is the self-gravity of the deflected boundary and of the anomaly, as in flowkernels'
-own surface-topography kernel. By construction
+with sigma_rr the non-dimensional normal-stress trace of flowkernels (positive in tension). A dense anomaly
+gives q < 0 (the plate is pulled down). Step 2, the elastic plate, turns q into a deflection.
 
-    q / ((rho_LAB - rho_w) g_LAB) = flowkernels' surftopo kernel of the truncated shell,
+The water that follows the geoid is not in this load: it is loaded where it is (at sea) and with the model's
+own geoid in forward/ocean.py (audit finding M1). flowkernels' free-surface kernel puts it in through its
+potential trace PHI, which is the geodesy-sign potential U = -Phi (Corrieu's U, not the physics sign):
 
-i.e. q is (density contrast) x g x (the deflection the LAB would have with no plate). A dense anomaly gives
-q < 0 (the plate is pulled down). Step 2, the elastic plate, turns q into a deflection.
+    K_h0 = -(eta_ref / r_LAB) (sigma_rr + (rho_w / rho_ref) PHI) / ((rho_LAB - rho_w) g_LAB)
+         = flowkernels' surftopo kernel of the truncated shell (water everywhere, sea surface on the
+           flowkernels geoid at r_LAB),
+
+kept for comparison with flowkernels and fem_1d. Without the water term, K_q / g_LAB is minus the mass of
+flowkernels' deflected top (K_m_top), so K_N + S(r_top) K_q / g_LAB is flowkernels' own geoid.
 
 pygeoinf
 --------
@@ -73,6 +78,9 @@ def reference_model(path=None):
 def viscosity_jump(factor=30.0, depth=670e3):
     """eta(r) relative to the upper mantle: 1 above `depth`, `factor` below. Returned as a function of radius
     (m) and surface radius R; the jump is put on the nearest model node (666 km for 670), as earth_kernels.py does.
+    flowkernels gives each layer the viscosity at its midpoint, so the layer from 677 to 666 km gets about 15.5:
+    the effective jump is near 672 km, 6 km below the density split at 666 km; this changes the kernels by
+    under 1e-3 for smooth fields (audit M6).
     """
 
     def eta(r, R):
@@ -133,6 +141,12 @@ class MantleFlow:
         h = hashlib.sha1()
         for a in (self.shell.r, self.shell.rho, self.shell.viscosity(1)):
             h.update(np.ascontiguousarray(a, float).tobytes())
+        import dataclasses
+
+        c = self.shell.constants
+        constants = (
+            dataclasses.asdict(c) if dataclasses.is_dataclass(c) else dict(vars(c))
+        )
         h.update(
             json.dumps(
                 [
@@ -141,8 +155,13 @@ class MantleFlow:
                     self.shell.compressible,
                     self.shell.layer_quadrature,
                     fk.__version__,
-                    "geoid-v1",
-                ]
+                    "geoid-v2-no-water-in-load",
+                    # the constants and the boundary conditions change the kernels too (audit M7)
+                    {k: repr(v) for k, v in sorted(constants.items())},
+                    repr(getattr(self.shell, "bc_top", None)),
+                    repr(getattr(self.shell, "bc_bottom", None)),
+                ],
+                default=repr,
             ).encode()
         )
         return h.hexdigest()[:16]
@@ -166,10 +185,13 @@ class MantleFlow:
             u_theta, sig_top, phi_top, sig_bot, phi_bot = fk.solve_degree_traces(
                 s, int(l)
             ).T
-            K_q[j] = (
-                -c.visc_ref / r[-1] * (sig_top + (c.rho_water / c.rho_ref) * phi_top)
+            K_q[j] = -c.visc_ref / r[-1] * sig_top
+            K_h0[j] = (
+                -c.visc_ref
+                / r[-1]
+                * (sig_top + (c.rho_water / c.rho_ref) * phi_top)
+                / ((s.rho[-1] - c.rho_water) * s.gravity[-1])
             )
-            K_h0[j] = K_q[j] / ((s.rho[-1] - c.rho_water) * s.gravity[-1])
             # geoid. flowkernels' surface-potential row is PHI + c_top sigma_rr + (CMB terms) = (attraction of
             # the anomaly): the c_top term is the self-gravity of the deflected top boundary. Removing it leaves
             # the potential of the anomaly and of the deflected CMB alone; the plate's deflection is added
@@ -223,8 +245,8 @@ class MantleFlow:
             rho_water=np.float64(c.rho_water),
             eta=eta[idx],
             notes=np.array(
-                "q_lm = sum(weights * K_q[l] * drho_lm(r)) [Pa], positive up; "
-                "K_h0 = K_q / ((rho_lab - rho_water) g_lab) [m per kg/m^3 per m]; "
+                "q_lm = sum(weights * K_q[l] * drho_lm(r)) [Pa], positive up, rock only (no water term); "
+                "K_h0: flowkernels' water-loaded free-surface deflection [m per kg/m^3 per m]; "
                 "K_N: geoid at the surface of the anomaly and the deflected CMB, without the top's deflection [m]; "
                 "K_N_fk: flowkernels' geoid at the top of the shell, deflected top included; "
                 "K_m_top: mass of that deflected top [kg/m^2]; "

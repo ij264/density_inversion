@@ -10,3 +10,7 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 .vscode/
+outputs/
+
+# private working notes (audit, guide): kept locally, not in the repository
+notes/

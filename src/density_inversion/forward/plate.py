@@ -19,7 +19,12 @@ Both plates use pygeoinf's flexure operator on the sphere (Sphere.flexural_opera
 
 with L the surface Laplacian, K = 1/R^2 the Gaussian curvature and D_eff = D (1 - nu). Our sphere spaces have
 radius 1 (components are orthonormal coefficients), so the rigidity is passed as D / R^4; with that scaling
-the operator is exactly the one on a sphere of radius R. For constant coefficients it is diagonal:
+it is pygeoinf's operator on a sphere of radius R (checked to 7e-16). That operator is the flat-plate bending
+energy written covariantly, not thin-shell theory: shell bending would give (D/R^4)(lam - 2)(lam - 1 - nu),
+which differs by under 1e-4 in F_l for l <= 50, and gives the rigid translation (l = 1) no stiffness.
+Membrane stresses are neglected: they would add E T_e / R^2 (lam - 2) / (lam - 1 + nu), about 89 Pa/m against
+a restoring term of 2.3e4 Pa/m, making F_l 0.2-0.4 % smaller (audit P2, P3). For constant coefficients it is
+diagonal:
 
     w_lm = F_l q_lm,   F_l = 1 / ( (D/R^4) [lam^2 - (1 - nu) lam] + drho g ),   lam = l(l+1),
 
@@ -35,8 +40,15 @@ OceanLoadedPlate    drho(x) from the ocean function, with fixed present-day coas
                     conjugate gradients, preconditioned by the constant-coefficient filter. Because C(x) is
                     a step at the coasts, the solve is done on a finer Gauss-Legendre grid (degree
                     quad_lmax, 3 lmax by default), the load padded with zeros and the deflection
-                    truncated back to lmax. At 3 lmax the result is converged to about 1 %; on the model's own
-                    grid aliasing errors reach 20 % at coasts. With C = 1 it is the ElasticPlate.
+                    truncated back to lmax. With the band-limited ocean function the model uses
+                    (ReferenceLithosphere.ocean) the solve converges spectrally: 0.2 % at 3 lmax, 0.02 % at
+                    4 lmax; with the raw 1 degree steps it stalled at about 3 % (audit P9). With C = 1 it
+                    is the ElasticPlate.
+
+Gravity: the restoring term uses g at the base of the plate (g_LAB = 9.91 m/s^2) for the water as well as for
+the mantle. The water sits at the surface, where g0 = 9.82, so at sea F_l is 0.4 % too small (audit P6). We
+keep one g in the plate equation and in the loads (lithosphere.py), so that isostatic balances stay exact
+mass balances; the 0.4-1 % from weighting each layer by its own g is part of the modelling-error budget.
 
 Both take rho_LAB, rho_w, g at the LAB and the surface radius R from step 1 (MantleFlow), so with T_e = 0 and
 water everywhere the plate gives back step 1's unflexed deflection exactly.
@@ -83,9 +95,7 @@ def rigidity(Te, E=E_DEFAULT, nu=NU_DEFAULT):
 def ocean_function(path=None):
     """The ocean function on its 1 degree grid: (lat centres, lon centres, C), lat from 89.5N down."""
     if path is None:
-        path = (
-            resources.files("density_inversion") / "data" / "ocean_function.csv"
-        )
+        path = resources.files("density_inversion") / "data" / "ocean_function.csv"
     C = np.loadtxt(path, delimiter=",")
     return 89.5 - np.arange(C.shape[0]), 0.5 + np.arange(C.shape[1]), C
 
@@ -124,16 +134,25 @@ class ElasticPlate:
 
     def filter(self):
         """F_l, m per Pa, l = 0..lmax: pygeoinf's constant-coefficient symbol (see the module notes)."""
+        self._check_constant_rigidity()
         lam = self.degrees() * (self.degrees() + 1.0)
         return 1.0 / (
-            self.D / self.R**4 * (lam**2 - (1 - self.nu) * lam)
-            + self.drho * self.g
+            self.D / self.R**4 * (lam**2 - (1 - self.nu) * lam) + self.drho * self.g
         )
 
     def flat_filter(self):
         """The flat-plate filter 1 / (D [l(l+1)/R^2]^2 + drho g), for comparison."""
+        self._check_constant_rigidity()
         lam = self.degrees() * (self.degrees() + 1.0)
         return 1.0 / (self.D * (lam / self.R**2) ** 2 + self.drho * self.g)
+
+    def _check_constant_rigidity(self):
+        # a laterally varying Te has no constant-coefficient filter; D is stored as 0 in that case, so the
+        # filter would silently be that of no plate (audit P15)
+        if getattr(self, "Te_field", None) is not None:
+            raise ValueError(
+                "no constant-coefficient filter for a laterally varying Te"
+            )
 
     def deflection_space(self, Q):
         """The deflection space: the load space itself (pygeoinf does not track units; components are in m)."""
@@ -142,9 +161,7 @@ class ElasticPlate:
     def operator(self, Q, W=None):
         """The LinearOperator q (Pa) -> w (m), from the load space Q (a sphere space of radius 1)."""
         _check_unit_sphere(Q)
-        F = Q.inverse_flexural_operator(
-            self.D / self.R**4, self.nu, self.drho * self.g
-        )
+        F = Q.inverse_flexural_operator(self.D / self.R**4, self.nu, self.drho * self.g)
         if W is not None and W != Q:
             F = Q.degree_transfer_operator(W) @ F
         return F
@@ -197,9 +214,7 @@ class OceanLoadedPlate(ElasticPlate):
     def fine_space(self, Q):
         """The Gauss-Legendre space the solve is done on: Q's Sobolev parameters at degree quad_lmax."""
         if isinstance(Q, sphere.Sobolev):
-            return sphere.Sobolev(
-                self.quad_lmax, Q.order, Q.length_scale, grid="GLQ"
-            )
+            return sphere.Sobolev(self.quad_lmax, Q.order, Q.length_scale, grid="GLQ")
         return sphere.Lebesgue(self.quad_lmax, grid="GLQ")
 
     def fields(self, H):
@@ -215,9 +230,7 @@ class OceanLoadedPlate(ElasticPlate):
         if self.Te_field is None:
             D = self.D
         else:
-            D = rigidity(
-                np.asarray(self.Te_field(LA, LO), float), self.E, self.nu
-            )
+            D = rigidity(np.asarray(self.Te_field(LA, LO), float), self.E, self.nu)
         return np.asarray(D) / self.R**4, buoyancy
 
     def operator(self, Q, W=None):
@@ -230,9 +243,7 @@ class OceanLoadedPlate(ElasticPlate):
         Finv = H.inverse_flexural_operator(
             D, self.nu, buoyancy, solver=CGSolver(rtol=self.rtol)
         )
-        return (
-            H.degree_transfer_operator(W) @ Finv @ Q.degree_transfer_operator(H)
-        )
+        return H.degree_transfer_operator(W) @ Finv @ Q.degree_transfer_operator(H)
 
     def assembled(self, Q, W=None):
         """The same operator as an explicit matrix (one solve per component), for repeated use."""

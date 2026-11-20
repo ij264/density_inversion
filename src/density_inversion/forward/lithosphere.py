@@ -219,6 +219,69 @@ class Lithosphere:
 # 3d: the reference structure's own load, q_ref = -g (M(x) - mean M), M the column mass to T plus the ice.
 
 
+# ---------------------------------------------------------------- band-limited 1 degree fields
+# The data are 1 degree cell values: steps at every cell edge, with power at every degree. Sampled point by
+# point on a Gauss-Legendre grid they alias (audit L3 / P9: 3 % of the reference load, 8 % in its upper
+# degrees, and no monotone convergence with the grid). Instead each field is projected onto spherical
+# harmonics up to the data's own resolution (degree 89; the projection is done by quadrature on a 0.25 degree
+# Gauss-Legendre grid, accurate to about 1e-3 at the coastlines), tapered from degree TAPER_FROM to 89 to
+# soften the ringing at sharp edges, and then evaluated on whatever Gauss-Legendre grid the model works on.
+# Products of band-limited fields are then integrated exactly once the grid is fine enough, and degrees
+# <= 2 lmax of each field are all that a product can bring into degrees <= lmax, so nothing the model
+# keeps is changed by the taper for lmax <= 35, and degrees above 70 are touched only by the taper.
+BANDLIMIT_LMAX = 89
+TAPER_FROM = 70
+_PROJECTION_LMAX = 359
+
+
+def _taper():
+    l = np.arange(BANDLIMIT_LMAX + 1)
+    t = np.clip((l - TAPER_FROM) / (BANDLIMIT_LMAX - TAPER_FROM), 0.0, 1.0)
+    return 0.5 * (1 + np.cos(np.pi * t))
+
+
+def project_cells(grid):
+    """A 180 x 360 grid of 1 degree cell values (rows from 89.5N, columns from 0.5E) -> tapered spherical-
+    harmonic coefficients (pyshtools 4-pi normalisation) up to BANDLIMIT_LMAX."""
+    import pyshtools as pysh
+
+    grid = np.asarray(grid, float)
+    lat, lon = pysh.expand.GLQGridCoord(_PROJECTION_LMAX)
+    i = np.clip(np.floor(90.0 - lat).astype(int), 0, grid.shape[0] - 1)
+    j = np.floor(np.mod(lon, 360.0)).astype(int) % grid.shape[1]
+    fine = grid[i[:, None], j[None, :]]
+    zero, w = pysh.expand.SHGLQ(_PROJECTION_LMAX)
+    cilm = pysh.expand.SHExpandGLQ(fine, w=w, zero=zero, lmax_calc=BANDLIMIT_LMAX)
+    return cilm * _taper()[None, :, None]
+
+
+def glq_degree(lat, lon):
+    """n if (lat, lon) is the full Gauss-Legendre grid of degree n (as meshgrid, indexing 'ij'), else None."""
+    import pyshtools as pysh
+
+    lat, lon = np.asarray(lat), np.asarray(lon)
+    if lat.ndim != 2 or lat.shape != lon.shape:
+        return None
+    n = lat.shape[0] - 1
+    if lat.shape[1] != 2 * n + 1:
+        return None
+    glat, glon = pysh.expand.GLQGridCoord(n)
+    if np.allclose(lat[:, 0], glat) and np.allclose(lon[0], glon):
+        return n
+    return None
+
+
+def synthesise(cilm, n):
+    """Band-limited coefficients -> values on the Gauss-Legendre grid of degree n."""
+    import pyshtools as pysh
+
+    zero, _ = pysh.expand.SHGLQ(n)
+    c = np.zeros((2, n + 1, n + 1))
+    m = min(n, cilm.shape[1] - 1)
+    c[:, : m + 1, : m + 1] = cilm[:, : m + 1, : m + 1]
+    return pysh.expand.MakeGridGLQ(c, zero=zero, lmax=n)
+
+
 def reference_data(path=None):
     """The reference lithosphere fields (see scripts/make_reference_lithosphere.py)."""
     from importlib import resources
@@ -234,16 +297,33 @@ def reference_data(path=None):
 class ReferenceLithosphere:
     """Laterally varying lithosphere from WINTERC-G: perturbation operators (3c) and the reference load (3d)."""
 
-    RHO_ICE = 910.0
+    RHO_ICE = 910.0  # WINTERC-G's README (layer 2) gives 910; Fullea et al. (2021, s4.3) quote 950 (audit L6)
 
     def __init__(
-        self, g, R, lmax, flow_top_depth, *, lid_nodes=3, quad_lmax=None, data=None
+        self,
+        g,
+        R,
+        lmax,
+        flow_top_depth,
+        *,
+        lid_nodes=3,
+        quad_lmax=None,
+        data=None,
+        lab_interface=False,
+        bandlimit=True,
     ):
         self.g, self.R, self.lmax = float(g), float(R), int(lmax)
         self.T = float(flow_top_depth)
         self.lid_nodes = int(lid_nodes)
         self.quad_lmax = int(quad_lmax or 3 * self.lmax)
+        # dLAB, the LAB as a displaceable interface, is off by default (audit L2 / fix 6): where WINTERC-G's
+        # LAB lies below the lid (28 % of the surface) its mass is inside the flow domain and was loaded as if
+        # it were in the plate (5-35 % too much); where it lies inside the lid it duplicates the lid nodes.
+        # The lid's density at its nodes carries the LAB's effect above T; the mantle unknown carries it below.
+        self.lab_interface = bool(lab_interface)
         self.data = data or reference_data()
+        self.bandlimit = bool(bandlimit)
+        self._cilm = {}
 
     @classmethod
     def from_mantle(cls, mf, **kw):
@@ -258,11 +338,58 @@ class ReferenceLithosphere:
 
     # ---------------------------------------------------------------- fields at points
     def sample(self, name, lat, lon):
-        """A 2-D field at points (degrees), by the 1 degree cell each point falls in."""
+        """A field at points (degrees). On a full Gauss-Legendre grid (the model's grids) the band-limited
+        field (see project_cells); elsewhere the value of the 1 degree cell each point falls in.
+        """
+        n = glq_degree(lat, lon) if self.bandlimit else None
+        if n is not None:
+            return self._sample_bandlimited(name, n)
+        return self._sample_cells(name, lat, lon)
+
+    def _coefficients(self, name, layer=None):
+        key = (name, layer)
+        if key not in self._cilm:
+            f = self.data[name] if layer is None else self.data[name][layer]
+            self._cilm[key] = project_cells(f)
+        return self._cilm[key]
+
+    def _sample_bandlimited(self, name, n):
+        f = self.data[name]
+        if name == "mantle_depths":
+            # knot depths are max(constant, Moho): rebuilt from the band-limited Moho so they stay ordered
+            moho = self._sample_bandlimited("moho_depth", n)
+            consts = [float(np.max(f[k])) for k in range(1, f.shape[0])]
+            return np.stack([moho] + [np.maximum(c, moho) for c in consts])
+        if f.ndim == 3:
+            return np.stack(
+                [synthesise(self._coefficients(name, k), n) for k in range(f.shape[0])]
+            )
+        return synthesise(self._coefficients(name), n)
+
+    def _sample_cells(self, name, lat, lon):
         f = self.data[name]
         i = np.clip(np.floor(90.0 - np.asarray(lat)).astype(int), 0, 179)
         j = np.floor(np.mod(np.asarray(lon), 360.0)).astype(int) % 360
         return np.asarray(f[..., i, j], float)
+
+    def ocean(self, lat, lon):
+        """The ocean function the model uses: the present-day one, and 1 where the ice floats (a floating
+        shelf and its cavity weigh what open water does; audit L5)."""
+        from .plate import sample_ocean_function
+
+        n = glq_degree(lat, lon) if self.bandlimit else None
+        if n is not None:
+            if ("ocean", None) not in self._cilm:
+                from .plate import ocean_function
+
+                self._cilm[("ocean", None)] = project_cells(ocean_function()[2])
+            C = synthesise(self._cilm[("ocean", None)], n)
+        else:
+            C = np.asarray(sample_ocean_function(lat, lon), float)
+        if "floating_ice" not in self.data:
+            return C
+        f = self.sample("floating_ice", lat, lon)
+        return C + f * (1.0 - C)
 
     def mantle_density(self, depth, lat, lon):
         """WINTERC-G mantle density at depth below sea level (m), linear between its knots, per column."""
@@ -301,14 +428,30 @@ class ReferenceLithosphere:
             node_depths=[moho + t_l / 2 * (1 + xn) for xn in x],  # below sea level
         )
 
-    def column_mass(self, lat, lon, n_quad=40):
-        """Mass per unit area from the surface to T below it, plus the ice (kg/m^2)."""
+    def lid_intervals(self, lat, lon):
+        """[(top, bottom)] depths below sea level (m) of the pieces of the lid between WINTERC-G's density
+        knots, clipped to the lid (Moho to T below the column's surface). The density is linear on each
+        piece, so integrals over a piece are exact with its end values. The pieces cover the lid exactly
+        (some have zero thickness)."""
         s = self.structure(lat, lon)
-        xg, wg = np.polynomial.legendre.leggauss(n_quad)
+        top, bottom = s["moho"], self.T - s["bed"]
+        knots = self.sample("mantle_depths", lat, lon)
+        edges = [top] + [np.clip(k, top, bottom) for k in knots] + [bottom]
+        return [(a, b) for a, b in zip(edges[:-1], edges[1:])]
+
+    def column_mass(self, lat, lon, n_quad=None):
+        """Mass per unit area from the surface to T below it, plus the ice (kg/m^2).
+
+        Exact: the lid's density is piecewise linear between knots, integrated piece by piece (audit G4;
+        n_quad is accepted for compatibility and ignored)."""
+        s = self.structure(lat, lon)
         lid = np.zeros_like(s["t_l"])
-        for xq, wq in zip(xg, wg):
-            z = s["t_c"] + s["t_l"] / 2 * (1 + xq)  # depth below the surface
-            lid += wq * s["t_l"] / 2 * self.mantle_density(z - s["bed"], lat, lon)
+        for a, b in self.lid_intervals(lat, lon):
+            lid += (
+                (b - a)
+                * 0.5
+                * (self.mantle_density(a, lat, lon) + self.mantle_density(b, lat, lon))
+            )
         ice = self.RHO_ICE * self.sample("ice_thickness", lat, lon)
         return s["rho_c"] * s["t_c"] + lid + ice
 
@@ -330,12 +473,11 @@ class ReferenceLithosphere:
         return LA, LO
 
     def summands(self):
-        """[(label, kind, field name)]: dMoho, dLAB, the crust's density, the lid's nodes."""
-        out = [
-            ("dMoho", "interface", "drho_moho"),
-            ("dLAB", "interface", "drho_lab"),
-            ("drho crust", "layer", "t_c"),
-        ]
+        """[(label, kind, field name)]: dMoho, (dLAB if lab_interface), the crust's density, the lid's nodes."""
+        out = [("dMoho", "interface", "drho_moho")]
+        if self.lab_interface:
+            out.append(("dLAB", "interface", "drho_lab"))
+        out.append(("drho crust", "layer", "t_c"))
         out += [
             (f"drho lid node {n}", "layer", ("node_weights", n))
             for n in range(self.lid_nodes)
