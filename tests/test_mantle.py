@@ -88,13 +88,14 @@ def test_operator_matches_quadrature(mf, ops, depth_km):
 )
 def test_unflexed_deflection_matches_fem_kernels():
     """With its top at the surface, the shell's deflection kernel matches the fem_1d kernels (kernels_jump30.npz,
-    a different solver) to within 1% at every degree 2-40."""
+    a different solver) to within 1% at every degree 1-40. Degree 1 is in the centre-of-mass frame in both
+    solvers (no external dipole); its agreement checks flowkernels' replaced row at l = 1."""
     full = MantleFlow(
         viscosity=viscosity_jump(30.0, 670e3), lab_depth=1.0, lmax=40, cache=False
     )
     fem = np.load(FEM_KERNELS)
     k = full.kernels
-    for l in range(2, 41):
+    for l in range(1, 41):
         a = k["K_h0"][l - 1]
         b = np.interp(k["r"], fem["r"], fem["K_h_b"][list(fem["degrees"]).index(l)])
         misfit = np.sqrt(

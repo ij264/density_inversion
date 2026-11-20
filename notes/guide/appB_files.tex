@@ -1,0 +1,36 @@
+\chapter{Where everything lives}
+\label{app:files}
+
+\begin{center}
+\small
+\begin{longtable}{p{0.45\textwidth}p{0.48\textwidth}}
+\toprule
+Path & What it is\\
+\midrule
+\endhead
+\multicolumn{2}{l}{\textbf{\texttt{density-inversion/src/density\_inversion/forward/}}}\\
+\texttt{mantle.py} & flow kernels from flowkernels (Ch.~\ref{ch:flow})\\
+\texttt{plate.py} & elastic plate, land and sea (Ch.~\ref{ch:plate})\\
+\texttt{lithosphere.py} & lithospheric unknowns and WINTERC-G reference (Ch.~\ref{ch:lithosphere})\\
+\texttt{surface.py} & the surface field $h_s$\\
+\texttt{geoid.py} & every mass's geoid (Ch.~\ref{ch:geoid})\\
+\texttt{ocean.py} & the self-gravitating ocean (Ch.~\ref{ch:ocean})\\
+\texttt{model.py} & assembly, sea-level constant (Ch.~\ref{ch:assembly})\\
+\texttt{examples.py} & conversions between coefficient conventions\\
+\multicolumn{2}{l}{\textbf{\texttt{density-inversion/scripts/single\_scaling/}}}\\
+\texttt{build\_core.py} & the core operator (Ch.~\ref{ch:core})\\
+\texttt{invert\_core.py} & evidence, fit, results (Ch.~\ref{ch:inversion}, \ref{ch:single})\\
+\texttt{rotate\_null.py} & the rotation null\\
+\texttt{build\_operator.py}, \texttt{invert.py} & full-model operator, older inversion, shared helpers (nodes, hats, harmonics)\\
+\multicolumn{2}{l}{\textbf{Elsewhere}}\\
+\texttt{density-inversion/tests/} & the verification tests; \texttt{test\_mantle.py} includes the \texttt{fem\_1d} check for $\ell=1$--40\\
+\texttt{density-inversion/notes/audit/} & findings, convention ledger, justification notes, referee reports\\
+\texttt{density-inversion/outputs/single\_scaling/} & operators, posteriors, result JSONs\\
+\texttt{products/geoid\_for\_inversion.npz} & the geoid data and its variances\\
+\texttt{data/hoggard/global.xyz} & residual depths: first 4,119 rows Stephenson (continents), the rest Holdt (oceans)\\
+\texttt{data/hc/} & HC tomography and viscosity files, blend script\\
+\texttt{ch3-overleaf} (branch \texttt{main}) & the chapter on Overleaf\\
+\texttt{ch3-drafts/drafts/} (branch \texttt{claude}) & Claude's reference drafts and notes\\
+\bottomrule
+\end{longtable}
+\end{center}

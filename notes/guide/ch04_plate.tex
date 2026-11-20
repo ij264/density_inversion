@@ -1,0 +1,123 @@
+\chapter{Extension 1: an elastic plate on land and sea}
+\label{ch:plate}
+
+\section{The problem with the core model}
+
+The core model assumes water everywhere.
+On land that is wrong: when the continental lithosphere is pushed up, air, not water, fills the space above it, so the restoring force is larger and the deflection smaller.
+The water-loaded prediction overestimates the continental deflection by $\rho_{\mathrm{LAB}}/(\rho_{\mathrm{LAB}}-\rho_w)\approx 1.44$.
+Continental data, such as the points of \citet{stephenson_continental_2024}, therefore cannot be compared with the core model.
+
+Once land and sea differ, the problem is no longer diagonal in degree: the restoring force depends on position through the ocean function $C(x)$ (1 at sea, 0 on land), and multiplying by $C(x)$ couples every degree to every other.
+And once a plate has a boundary between land and sea, it matters whether that plate can transmit stress across the coastline.
+That brings in the plate's strength.
+
+\section{How we tackle it}
+
+We replace the strengthless lid by a thin elastic plate, with the restoring contrast varying with position:
+\begin{equation}
+    \underbrace{q}_{\text{up}} =
+    \underbrace{D\,\nabla^4 w}_{\text{bending}} +
+    \underbrace{\Delta\rho(x)\,g\,w}_{\text{weight of the infill}},
+    \qquad
+    \Delta\rho(x) = \rho_{\mathrm{LAB}} - \rho_w\,C(x),
+    \qquad
+    D = \frac{E\,T_e^3}{12(1-\nu^2)} .
+\end{equation}
+Force up = force down: the mantle's load is balanced by the plate's bending resistance and by the weight of whatever fills the deflection, mantle below, water at sea, air on land.
+
+Using a plate solves two problems at once.
+Without strength, each column would float on its own, $w = q/(\Delta\rho(x)\,g)$, and the deflection would jump by a factor of 1.44 at every coastline: a step with power at all degrees, which no real lithosphere supports.
+The plate spreads that step over a flexural wavelength, so the deflection is smooth and band-limited.
+And it gives the lithosphere the strength that it actually has \citep{watts2001isostasy}, which the full model needs anyway for short-wavelength crustal loads.
+
+\section{The plate on a sphere}
+
+On a sphere, $\nabla^4$ becomes the square of the surface Laplacian, with curvature corrections.
+We use the flexural operator of pygeoinf, which writes the bending energy of a plate covariantly on the sphere:
+\[
+    \mathrm{Op}(w) = L(D L w) - L(D_{\mathrm{eff}}) L w + \operatorname{tr}(\mathrm{Hess}\,D_{\mathrm{eff}}\,\mathrm{Hess}\,w) + 2K\,\nabla D_{\mathrm{eff}}\cdot\nabla w - K D_{\mathrm{eff}} L w + \Delta\rho\,g\,w,
+\]
+with $L$ the surface Laplacian, $K = 1/R^2$ the Gaussian curvature and $D_{\mathrm{eff}} = D(1-\nu)$.
+For constant rigidity and contrast this is diagonal in degree, with filter
+\begin{equation}
+    F_\ell = \frac{1}{(D/R^4)\left[\lambda^2 - (1-\nu)\lambda\right] + \Delta\rho\,g},
+    \qquad \lambda = \ell(\ell+1),
+\end{equation}
+so that $w_{\ell m} = F_\ell\, q_{\ell m}$.
+
+\begin{decision}{The covariant flat-plate operator, not thin-shell theory}
+\textbf{Choice.} pygeoinf's operator, which is the bending energy of a flat plate written on the sphere.
+
+\textbf{Alternative.} Thin-shell bending, which gives $(D/R^4)(\lambda-2)(\lambda-1-\nu)$ in place of $(D/R^4)[\lambda^2-(1-\nu)\lambda]$, and adds membrane stresses.
+
+\textbf{Why.} The two bending terms differ in $F_\ell$ by less than $10^{-4}$ for $\ell\le 50$.
+Membrane stresses would add $(E T_e/R^2)(\lambda-2)/(\lambda-1+\nu)$, which changes $F_\ell$ by \qtyrange{0.2}{0.4}{\percent}.
+Both are far below the data errors, and pygeoinf's operator handles laterally varying rigidity, which a future version may need.
+\end{decision}
+
+\section{Does the plate's strength matter?}
+
+At long wavelength the bending term is negligible: it grows as $\ell^4$, while the buoyancy term is constant.
+The two are equal at about $\ell\approx 93$ for $T_e = \qty{40}{km}$.
+With $E=\qty{90}{GPa}$, $\nu = 0.25$, $T_e = \qty{40}{km}$, flexure reduces the deflection at sea by \qty{8}{\percent} at degree 50, \qty{3.5}{\percent} at degree 40, \qty{1}{\percent} at degree 30 and \qty{0.2}{\percent} at degree 20 (on land somewhat less).
+The sensitivity to $T_e$ depends strongly on degree.
+For $T_e=\qty{80}{km}$, flexure reduces the deflection at sea by \qty{2}{\percent} at degree 20, \qty{8.5}{\percent} at degree 30 and \qty{22}{\percent} at degree 40 (on land 1, 6 and \qty{17}{\percent}).
+So $T_e$ is unimportant below degree 20 but not over the full range of degrees 1--40 that the topography uses.
+
+\begin{defence}
+\Q{Why $T_e=\qty{40}{km}$? Oceanic $T_e$ depends on age and continental $T_e$ varies enormously.}
+\A Below degree 20 the answer barely depends on it: $T_e$ from 0 to \qty{80}{km} changes the predictions by under \qty{2}{\percent}.
+At degrees 30--40 it does matter (up to \qty{22}{\percent} at degree 40 for \qty{80}{km}), so either restrict the claim to low degree, or run the inversion for several $T_e$ and report the spread.
+The plate is there for the land--sea coupling, not for its flexural wavelength.
+A laterally varying $T_e$ is supported by the code if it is ever needed.
+
+\Q{Why one value of $g$?}
+\A The plate is thin, so its load and restoring force are evaluated at its base, $g_{\mathrm{LAB}} = \qty{9.91}{m/s^2}$, for the water as well as for the mantle; the geoid uses surface gravity $g_0 = \qty{9.82}{m/s^2}$.
+Strictly the water sits at the surface, so the restoring term should be $\rho_{\mathrm{LAB}}g_{\mathrm{LAB}}-\rho_w g_0$; using $g_{\mathrm{LAB}}$ for the water makes the restoring force \qty{0.4}{\percent} too small at sea, and so $F_\ell$ \qty{0.4}{\percent} too large. (The docstring in \texttt{plate.py} says ``too small''; that wording should be corrected.)
+We keep one $g$ in the plate equation and in the lithospheric loads so that isostatic balances stay exact, and accept the \qty{0.4}{\percent}.
+
+\Q{What about floating ice?}
+\A Where an ice shelf floats, the deflection is filled by water beneath the ice, so the restoring contrast is that of open water: we set $C=1$ there.
+\end{defence}
+
+\section{Solving it}
+
+With $C(x)$ varying, the operator is no longer diagonal.
+pygeoinf solves it matrix-free by conjugate gradients (relative tolerance $10^{-10}$), preconditioned by the constant-coefficient filter.
+Why the condition number is the density ratio: write the operator as $A = B + g\,\Delta\rho(x)$, with $B$ the bending operator, and the preconditioner as $P = B + g\,\Delta\rho_{\mathrm{sea}}$.
+The eigenvalues of $P^{-1}A$ lie between the extremes of the Rayleigh quotient
+\[
+    \frac{\langle w, Aw\rangle}{\langle w, Pw\rangle}
+    = \frac{\langle w, Bw\rangle + g\int \Delta\rho(x)\,w^2\,\mathrm d\Omega}{\langle w, Bw\rangle + g\,\Delta\rho_{\mathrm{sea}}\int w^2\,\mathrm d\Omega}.
+\]
+Bending appears identically above and below; only the buoyancy differs, and $\Delta\rho_{\mathrm{sea}}\le\Delta\rho(x)\le\Delta\rho_{\mathrm{land}}$.
+So the quotient lies between 1 (deflection entirely at sea) and $\rho_{\mathrm{LAB}}/(\rho_{\mathrm{LAB}}-\rho_w)\approx1.44$ (deflection entirely on land, bending negligible), and $\kappa\le1.44$; bending only pulls it towards 1.
+CG reduces the error by about $(\sqrt\kappa-1)/(\sqrt\kappa+1)\approx0.09$ per iteration, so about ten iterations reach $10^{-10}$.
+The measured condition number is 1.44: at long wavelength, continents are large enough to hold a deflection, and the bound is nearly reached.
+
+Because $C(x)$ is a step at the coasts, the solve is done on a finer Gauss--Legendre grid, of degree $3L$ by default, for two reasons.
+First, the deflection has power above degree $L$ even when the load does not: multiplying by a step couples every degree to every other, and solving only up to $L$ is a truncated problem whose low-degree answer is wrong, because the missing high degrees feed back through $C(x)w$.
+Second, the product $\Delta\rho(x)\,w(x)$ is formed pointwise on the grid, and contains degrees up to the degree of $w$ plus that of $C$; a grid only just fine enough for $L$ would alias the excess into low degrees.
+The choice of $3L$ is a measured convergence choice, not a theoretical one: the load is padded with zeros to that degree, and the deflection is returned either on the fine grid or truncated back to $L$.
+With the band-limited ocean function the model uses, the solve converges spectrally: \qty{0.2}{\percent} at $3L$ and \qty{0.02}{\percent} at $4L$.
+With the raw \qty{1}{\degree} steps it stalled at about \qty{3}{\percent}, which is why the ocean function is band-limited.
+
+\begin{decision}{Keep the deflection on the fine grid}
+\textbf{Choice.} The deflection is carried at the fine degree into the geoid calculation and truncated only at the end.
+
+\textbf{Alternative.} Truncate $w$ to degree $L$ straight after the solve.
+
+\textbf{Why.} The coastline puts power into high degrees.
+Truncating there loses \qtyrange{0.5}{0.8}{\percent} of the moved mass, and because the geoid is a small difference of large compensating terms, that is \qtyrange{10}{23}{\percent} of the geoid.
+\end{decision}
+
+\begin{incode}{\texttt{src/density\_inversion/forward/plate.py}}
+\begin{itemize}[nosep]
+\item \texttt{rigidity(E, Te, nu)}: $D = E T_e^3/(12(1-\nu^2))$.
+\item \texttt{ElasticPlate.filter}: $F_\ell$ for constant rigidity and contrast (and \texttt{flat\_filter} for comparison).
+Because pygeoinf's sphere spaces have unit radius, the rigidity is passed as $D/R^4$; this reproduces the operator on a sphere of radius $R$ to $7\times10^{-16}$.
+\item \texttt{OceanLoadedPlate}: the land--sea plate. \texttt{fine\_space} is the Gauss--Legendre space of degree \texttt{quad\_lmax}; \texttt{fields} gives $D/R^4$ and $\Delta\rho(x)g$ on that grid; \texttt{operator} pads the load to the fine degree, solves by CG, and truncates; \texttt{assembled} builds the operator as an explicit matrix for repeated use.
+\item The ocean function comes from \texttt{ocean\_function} (a \qty{1}{\degree} grid), with floating ice set to 1 in \texttt{ReferenceLithosphere.ocean}.
+\end{itemize}
+\end{incode}

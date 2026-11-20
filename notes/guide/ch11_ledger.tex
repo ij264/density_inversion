@@ -1,0 +1,88 @@
+\chapter{The decision ledger}
+\label{ch:ledger}
+
+Every modelling decision in one place: what was chosen, the evidence for it, and the caveat to state.
+
+\begin{center}
+\small
+\begin{longtable}{p{0.22\textwidth}p{0.38\textwidth}p{0.3\textwidth}}
+\toprule
+Decision & Evidence & Caveat\\
+\midrule
+\endhead
+Linear--Gaussian & exact posterior and evidence; flow linear in $\delta\rho$ & viscosity fixed per run; lithosphere linearised (Ch.~\ref{ch:lithosphere})\\
+Build the forward model up in stages; two inversions (core, full) & each stage checked against the previous by forward comparison; core vs full: $r\ge0.996$, \qtyrange{1}{4}{\percent} at ocean points & changes between the two inversions not attributable by inversion alone\\
+Compressible, self-gravitating flow & standard since \citet{corrieu_mantle_1995}; negligible cost & comparison with incompressible studies needs care\\
+Sparse BVP, not propagators & no exponential ill-conditioning; matches \texttt{fem\_1d} to \qty{0.1}{\percent} & radial grid first-order\\
+Free slip, flow top at \qty{105}{km} & mean WINTERC-G LAB \qty{102}{km} & \qty{28}{\percent} of area has a deeper LAB\\
+$\times30$ jump at \qty{670}{km} & log BF 30--35 across variants (full model) & density depends on viscosity: adjoint kernels\\
+Degree 1 included & \texttt{fem\_1d} agreement $10^{-4}$; real data & lowers BF 39.0 $\to$ 35.2\\
+Moved mass at the surface & mass at \qty{105}{km} gave geoid wrong by 0.2--3$\times$ & ---\\
+Water follows the geoid; $h = w - N$ & \qty{2}{\percent} of $w$ at $\ell=2$; $N/w\approx\qty{5}{\percent}$; limit test $10^{-10}$ & net effect on $N$ only \qty{0.1}{\percent}\\
+Elastic plate on land and sea & land deflection otherwise 1.44$\times$ too large & $T_e$ matters above $\ell\approx20$ (\qty{22}{\percent} at $\ell=40$ for \qty{80}{km})\\
+Deflection kept on the fine grid & truncation loses \qtyrange{10}{23}{\percent} of the geoid & ---\\
+WINTERC-G reference & consistent crust + lid densities globally & circular: fitted to elevation and gravity\\
+One crust layer, three lid nodes & topography sees only column mass & up to \qty{1.3}{m} of geoid from crustal layering\\
+$\delta$LAB dropped & double counting where LAB $>\qty{105}{km}$ & ---\\
+Lid base at \qty{105}{km} (current) & matches flow top; inherited from the core model & cratons \qty{+865}{m} high in the reference; keels treated as fluid\\
+Lid base $T(x)=\max(105, \mathrm{LAB})$ with a mantle mask (planned, (b)) & keel counted once, in the lid; no solver change & flow not deflected around keels; oceanic asthenosphere above \qty{105}{km} still lid\\
+Flow top a sphere at \qty{105}{km} & per-degree solver needs spherical boundaries & lateral viscosity would need a 3D solver\\
+Sheets at their own depth & mean-depth error $3\times$ (\qty{-0.70}{} vs \qty{-0.24}{m}) & ---\\
+$K_0$ fitted on thin-lithosphere columns & removes \qty{705}{m} land--ocean step & fitted to the same data; degenerate with Moho$_{00}$\\
+Point evaluation of topography & keeps errors independent & thinning to \qty{1}{\degree} cells\\
+Correlated field in the noise & residual correlation 0.63 within \qty{25}{km} & overlaps the mantle term (\qty{99}{\percent})\\
+Diagonal geoid errors + $\tau^2$ & low-rank covariances near-singular ($10^{-13}$) & ---\\
+Type-II ML hyperparameters & keeps evidence analytic & sds too small; ln BF $\lesssim2$ not meaningful\\
+Rotation null & rotated fits $-5.6$ to $-3.3$ vs $+35.2$ & 6 rotations so far; run $\sim$50\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{The questions most likely to come up}
+
+\Q{In one sentence, what does your forward model do?}
+\A It computes the instantaneous flow driven by a mantle density anomaly in a compressible, self-gravitating Earth with radial viscosity, and from it the deflection of an elastic lithosphere floating in a self-gravitating ocean, and the geoid of every mass that moves.
+
+\Q{Why should I believe topography breaks the depth degeneracy?}
+\A It doesn't break it on its own: each kernel is a depth average.
+What helps is that the two kernels have different depth shapes (topography one-signed and largest when shallow; the geoid changing sign with depth and degree), that their shapes change with degree, and that $R(z)$ is assumed common to all degrees.
+In particular, a shallow dense anomaly and a deeper light one can give the same geoid but give topography of opposite sign.
+
+\Q{What is the weakest part of the model?}
+\A The lithosphere: the reference model was fitted to the same kind of data, the lid base is fixed at \qty{105}{km} although cratonic roots go deeper, and the geoid of the lithosphere is a small remainder of large terms.
+That is why the first inversion uses only oceanic data and the core model, and why the full model carries a modelling-error covariance.
+
+\Q{What would change your conclusions?}
+\A A different viscosity profile changes the recovered density (quantified by the adjoint kernels); a different reference lithosphere changes the continental results; a deeper lid base moves cratonic signal from mantle to lithosphere.
+How sensitive the oceanic single-scaling result is to these has only been tested with the earlier full model (viscosity: log Bayes factor 30--35; tomography: 17--21), and still needs repeating with the core model.
+
+\Q{Why not use a 3D viscosity?}
+\A Lateral viscosity variations couple every degree to every other, so the per-degree solver no longer works and each column of the operator needs a 3D Stokes solve.
+For a fixed viscosity field the problem would still be linear in density; the costs are computation, the loss of the exact per-degree kernels on which the viscosity kernels rely, and a new uncertain input (the keel's viscosity).
+Lateral variations are a known limitation, partly represented by the lithosphere being a separate elastic layer and, in (b), by keels being carried isostatically in the lid.
+
+\Q{How do you know the code is right?}
+\A Every component agrees with something independent: closed forms, symbolic algebra, a separate finite-element code, brute-force integrals and conservation laws (Chapter~\ref{ch:assembly}).
+An independent audit found errors, and each was fixed with a test that would catch it again.
+
+\section{Limitations and future work}
+What can be deferred, and at what cost:
+\begin{center}
+\small
+\begin{longtable}{p{0.3\textwidth}p{0.3\textwidth}p{0.3\textwidth}}
+\toprule
+Item & Cost of deferring & Status\\
+\midrule
+\endhead
+Shallower flow top (\qtyrange{50}{60}{km}) & oceanic asthenosphere stays in the lid & future work\\
+Second crustal node & up to \qty{1.3}{m} of geoid from layering & future work, or modelling-error covariance\\
+Lateral viscosity & flow not deflected around keels & future work (3D solver)\\
+Relinearisation about the posterior & a few per cent where the posterior moves far & future work\\
+Self-gravitating ocean & \qtyrange{1}{2}{\percent} of $w$ at $\ell=2$ & deferrable with its size stated (already built; to discuss with David)\\
+Lid base at the LAB, (b) & cratons \qty{+865}{m} high in the reference & deferrable only with a lid-depth sensitivity test and no interpretation beneath cratons\\
+Plate on land and sea & land wrong by a factor 1.44 & not deferrable if continents are used\\
+Sea-level constant & \qty{705}{m} land--ocean step & not deferrable if continents are used\\
+\bottomrule
+\end{longtable}
+\end{center}
+The key decision is whether the final inversion includes continents; most of the complexity follows from it.

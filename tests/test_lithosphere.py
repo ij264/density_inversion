@@ -230,3 +230,20 @@ def ex_grid(comp):
     from density_inversion.forward import examples as ex
 
     return ex.to_grid(comp, LMAX)
+
+
+def test_lid_base_can_go_below_110_km():
+    """The reference carries WINTERC-G's densities to 400 km (audit fix 6), so the lid's base can be moved
+    deeper: the lid's pieces still cover it exactly and its density keeps changing below 110 km.
+    """
+    from density_inversion.forward.mantle import MantleFlow, viscosity_jump
+
+    mf = MantleFlow(viscosity=viscosity_jump(30.0, 670e3), lab_depth=200e3, lmax=8)
+    ref = ReferenceLithosphere.from_mantle(mf)
+    lat, lon = np.array([60.0, 0.0]), np.array([260.0, 200.0])
+    s = ref.structure(lat, lon)
+    pieces = ref.lid_intervals(lat, lon)
+    assert np.allclose(sum(b - a for a, b in pieces), ref.T - s["bed"] - s["moho"])
+    assert not np.allclose(
+        ref.mantle_density(150e3, lat, lon), ref.mantle_density(190e3, lat, lon)
+    )

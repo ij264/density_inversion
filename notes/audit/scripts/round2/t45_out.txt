@@ -1,0 +1,18 @@
+
+[h_ref] repo G_w vs exact-sheet evaluation of the same sheets: 3.88e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.014  l36-50: 0.021
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.006  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.013  l36-50: 0.021
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+[w_dyn] repo G_w vs exact-sheet evaluation of the same sheets: 4.27e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.002  l5-10: 0.004  l11-20: 0.008  l21-35: 0.014  l36-50: 0.020
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.005  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.002  l5-10: 0.004  l11-20: 0.007  l21-35: 0.013  l36-50: 0.019
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+real	0m37.381s
+user	0m37.093s
+sys	0m0.474s

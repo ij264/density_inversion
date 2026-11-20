@@ -1,0 +1,139 @@
+\chapter{The inversion framework}
+\label{ch:inversion}
+
+\section{The posterior}
+
+With a linear forward model $d = Gm + e$, a Gaussian prior $m\sim\mathcal N(m_0, C_m)$ and Gaussian errors $e\sim\mathcal N(0, C_d)$, the posterior is Gaussian with
+\begin{equation}
+    \tilde C = \left(C_m^{-1} + G^{\mathsf T}C_d^{-1}G\right)^{-1},
+    \qquad
+    \tilde m = m_0 + \tilde C\,G^{\mathsf T}C_d^{-1}(d - Gm_0)
+\end{equation}
+\citep{tarantola_inverse_2005}.
+Everything is exact: no sampling, no convergence to check.
+
+\section{The evidence}
+
+The evidence is the probability of the data under the model, with the unknowns integrated out:
+\begin{equation}
+    p(d) = \mathcal N\!\left(d;\ Gm_0,\ C_d + G C_m G^{\mathsf T}\right).
+\end{equation}
+It is computed in model space, which is small (28 scaling nodes plus the correlated field), using the Woodbury identity and the matrix determinant lemma:
+\[
+    \ln p(d) = -\tfrac12\Big[(d-Gm_0)^{\mathsf T}C_d^{-1}(d-Gm_0) - g^{\mathsf T}H^{-1}g
+    + \ln|C_d| + \ln|C_m| + \ln|H| + n\ln 2\pi\Big],
+\]
+with $H = C_m^{-1} + G^{\mathsf T}C_d^{-1}G$ and $g = G^{\mathsf T}C_d^{-1}(d-Gm_0)$.
+The data covariance is diagonal, so $C_d^{-1}$ and $\ln|C_d|$ are trivial; only $H$ (of model-space size) has to be factorised.
+
+\begin{incode}{\texttt{invert\_core.py}, \texttt{Joint.solve}}
+Builds $M = A^{\mathsf T}C_d^{-1}A$ and $b = A^{\mathsf T}C_d^{-1}d$ once (in \texttt{\_\_init\_\_}), where $A$ stacks the correlated-field harmonics, the scaling columns and a constant.
+For each set of hyperparameters it forms the prior precision \texttt{Pinv}, adds $M$, Cholesky-factorises $H$, and returns $\ln p(d)$, and with \texttt{full=True} the posterior mean and covariance.
+\end{incode}
+
+\section{Hyperparameters}
+
+The prior and noise models have a few parameters: the amplitude and length scale of $R(z)$, the amplitude and length scale of the correlated field, and the geoid modelling-error fraction.
+We choose them by maximising the evidence (type-II maximum likelihood), within physical bounds:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Hyperparameter & Meaning & Bounds\\
+\midrule
+$\sigma_c$ & pointwise sd of the correlated field & \qtyrange{10}{2000}{m}\\
+$\ell_c$ & its length scale & \qtyrange{50}{5000}{km}\\
+$\tau$ & geoid modelling error, fraction of observed amplitude & $10^{-3}$--3\\
+$\sigma_R$ & sd of $R(z)$ about its mean & $10^{-3}$--10\\
+$\ell_R$ & depth correlation length of $R$ & \qtyrange{50}{5000}{km}\\
+\bottomrule
+\end{tabular}
+\end{center}
+The bounds were added after an unbounded geoid-only fit ran off to overflow.
+
+\begin{decision}{Type-II maximum likelihood rather than full hierarchical sampling}
+\textbf{Why.} It keeps the posterior analytic and the evidence comparable across models.
+\textbf{Cost.} Hyperparameter uncertainty is ignored, so posterior standard deviations are somewhat too small, and the richer model gets a few nats for free: in no-signal tests the maximised log Bayes factor reached up to about $+2$.
+Bayes factors much larger than that are therefore meaningful; ones of order 2 are not.
+\end{decision}
+
+\section{The noise model for topography}
+
+\paragraph{Thinning.}
+Holdt's 10,874 oceanic points are averaged in \qty{1}{\degree} cells, giving 7,434 cells.
+The error of a cell is the rms of its points' errors, not reduced by $\sqrt n$, because residuals of nearby points are correlated (correlation 0.63 within \qty{25}{km}, near zero beyond \qty{100}{km}): averaging correlated errors does not reduce them by $\sqrt n$.
+
+\paragraph{The correlated field.}
+Residual depths contain signal the mantle term cannot produce (unmodelled crust, the lithosphere's own variation, errors in the corrections), and it is spatially correlated.
+Leaving it out would force the mantle term to fit it, or would make the errors look independent when they are not.
+We add a field $c(x)$ of degrees 1--40, with a Sobolev-type spectrum $\propto(1 + (\ell_c/b)^2\ell(\ell+1))^{-2}$ normalised so that its pointwise standard deviation is $\sigma_c$, and integrate it out.
+
+\paragraph{The constant.}
+Residual depths are relative to an age--depth curve, whose zero is arbitrary; a constant $b_0$ (prior sd \qty{1000}{m}) is fitted.
+
+\section{The noise model for the geoid}
+
+The geoid product gives coefficients at degrees 2--25 with variances from the satellite model, the crustal correction and the LAB correction, plus the hydrostatic term, for which we use the uncertainty of \citet{chambat_flattening_2010} (\qty{1}{m} on $C_{20}$, \qty{0.2}{m} on $C_{40}$).
+$C_{21}$ and $S_{21}$ are removed, because they are dominated by the rotational pole, not the mantle.
+
+\begin{decision}{Diagonal geoid covariance plus a modelling error}
+\textbf{Choice.} Use the diagonal of the stated covariance, floored at 0.2 times the median within each degree, and add $\tau^2$ times the observed power at each degree.
+
+\textbf{Why.} The product's low-rank covariances are each the mean of only 2--4 difference vectors, so they assert exact correlations and leave some combinations of coefficients with only the satellite variance, about $10^{-13}\,\mathrm{m}^2$: the inversion then fits those combinations exactly.
+The modelling-error term represents geoid structure that a single 1D scaling cannot produce; without it the geoid-only $R(z)$ oscillated wildly to fit noise.
+\end{decision}
+
+\section{The prior on $R(z)$}
+
+$R(z)$ is given on 28 nodes (\qty{105}{km}, then \qtyrange{200}{2800}{km} every \qty{100}{km}) with hat functions in between.
+Its prior has a squared-exponential correlation in depth plus a common offset with standard deviation $\sigma_\mu = 1$ that is marginalised:
+\[
+    C_R = \sigma_R^2\exp\!\left[-\tfrac12\left(\frac{z_i-z_j}{\ell_R}\right)^2\right] + \sigma_\mu^2\,\mathbf 1\mathbf 1^{\mathsf T},
+    \qquad m_0 = 0.
+\]
+The offset term means the prior does not force $R$ towards zero on average; it lets the data choose the mean level, while $\sigma_R$ controls variation about it.
+
+\section{The mantle unknown in the final inversion}
+In the final inversion the mantle density $\delta\rho_m(r,x)$ is itself the unknown, a full 3D field with of order $10^4$ coefficients; no scaling of tomography is imposed.
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+& First inversion (core) & Final inversion\\
+\midrule
+Mantle unknown & $R(z)$, 28 numbers & $\delta\rho_m(r,x)$, a 3D field\\
+Lateral pattern from & tomography, fixed & the data and the prior\\
+Lithosphere & corrected in the data & unknowns about WINTERC-G\\
+Data & oceanic residual depths, geoid & total topography everywhere, geoid\\
+\bottomrule
+\end{tabular}
+\end{center}
+The data give at most two numbers per $(\ell,m)$, so the null space is large and the depth distribution of density comes almost entirely from the prior.
+The prior is an open decision:
+\begin{enumerate}[nosep]
+\item \textbf{zero mean, Sobolev covariance}: the data alone choose the pattern; cleanest, poorest depth resolution;
+\item \textbf{scaled tomography as the prior mean}, $m_0 = \rho_0\,\hat R(z)\,\mathrm{dlnV_s}$ with $\hat R$ from the first inversion: the final inversion then asks where the mantle departs from the scaling once the lithosphere is modelled, which links the two inversions; it inherits tomography's errors where the data are silent;
+\item \textbf{tomography in the covariance only}, for example a larger variance where $|\mathrm{dlnV_s}|$ is large.
+\end{enumerate}
+
+\section{Testing whether the fit means anything}
+
+\paragraph{The Bayes factor.}
+The log Bayes factor of the scaling model against a null model ($R=0$, same noise model) is the difference of their log evidences.
+A value of 5 means the data are $e^5\approx150$ times more probable under the scaling; on the scale of \citet{kass_bayes_1995}, $\ln B$ of 3--5 is strong and above 5 very strong. With the offset prior $\sigma_\mu=1$ fixed, the Bayes factor also contains an Occam factor that depends logarithmically on $\sigma_\mu$, so state that value whenever you quote a Bayes factor.
+
+\paragraph{The rotation null.}
+A large Bayes factor could arise because any smooth field with the right spectrum helps, not because the tomography's geography is right.
+To test that, we rotate all predicted node fields by the same random rotation of the sphere, which keeps their spectra and depth structure but destroys their alignment with the data, and refit.
+If the geography matters, the rotated fits should do much worse than the unrotated one; they do (log Bayes factors $-5.6$ to $-3.3$ against $+35.2$).
+
+\begin{defence}
+\Q{Isn't the correlated field just absorbing the signal?}
+\A It overlaps strongly with the mantle term: each mantle column lies \qtyrange{98.7}{99.2}{\percent} in the span of the field's harmonics.
+So ``variance explained by the mantle'' means the share assigned to the mantle under the fitted priors.
+The Bayes factor and the rotation null are what show that the mantle term is doing something the field cannot.
+
+\Q{Why point evaluation rather than spherical harmonic coefficients of the data?}
+\A Because the data are points with individual errors and large gaps.
+Expanding them into coefficients first would need interpolation into the gaps and would turn independent errors into correlated ones.
+Evaluating the prediction at the points keeps the data as they are.
+\end{defence}

@@ -1,0 +1,37 @@
+\chapter{Conventions}
+\label{app:conventions}
+
+\begin{center}
+\small
+\begin{longtable}{p{0.25\textwidth}p{0.68\textwidth}}
+\toprule
+Quantity & Convention\\
+\midrule
+\endhead
+Stress & positive in tension; $\sigma_{rr}$ from flowkernels' traces, non-dimensional, times $\eta_{\mathrm{ref}}/r_{\mathrm{top}}$\\
+Potential & physics sign, $\nabla^2\Phi = 4\pi G\rho$, so $\Phi<0$ near a mass; Corrieu's $U = -\Phi$\\
+Geoid & $N = -\Phi/g_0$ at $r=R$; a mass excess raises $N$\\
+Load $q$ & \si{Pa}, positive up; a mass excess gives $q<0$\\
+Deflection $w$ & m, positive up; the radial motion of the column\\
+Topography $h$ & $h = w - N$, measured from sea level (orthometric), on land and at sea\\
+Interface perturbation & positive up; $\Delta\rho_i = \rho_{\mathrm{below}} - \rho_{\mathrm{above}}$; relative to the plate\\
+Depths in WINTERC-G & positive down from sea level; bedrock elevation positive up\\
+Reference column & from the column's own surface to $T=\qty{105}{km}$ below it\\
+Harmonics (package) & real, orthonormal on the unit sphere ($\int Y^2\,\mathrm d\Omega = 1$), Condon--Shortley phase $+1$ (pyshtools \texttt{norm=4, csphase=1})\\
+Component order & degree by degree; orders $0, 1..\ell, -1..-\ell$\\
+Sphere spaces & unit radius; components are orthonormal coefficients; plate rigidity passed as $D/R^4$\\
+Geoid product & orthonormal, Condon--Shortley phase $-1$, radius $a = \qty{6378136.3}{m}$, degrees 2--25; convert by $(-1)^m (R/a)^{\ell-1}$\\
+HC tomography & dlnVs in per cent; \texttt{hc\_io} output is csphase $+1$ although its docstring says $-1$\\
+Degree 0 & excluded from the mantle and geoid; constants fitted separately ($b_0$, $\delta K$)\\
+Degree 1 & centre-of-mass frame: $N_1=0$; load and topography at $\ell=1$ kept, $h_1=w_1$\\
+Gravity & $g_{\mathrm{LAB}} = \qty{9.91}{m/s^2}$ for loads and the plate; $g_0 = GM/R^2 = \qty{9.82}{m/s^2}$ for the geoid\\
+Densities & $\rho_w = \qty{1030}{kg/m^3}$; $\rho_{\mathrm{ice}} = \qty{910}{kg/m^3}$; $\rho_{\mathrm{LAB}}$ from PREM at the flow top\\
+Ocean function & $C=1$ at sea and under floating ice, 0 on land\\
+Viscosity & 1 above \qty{670}{km}, 30 below (jump on the node at \qty{666}{km})\\
+RMS of a field & $\sqrt{\sum c_{\ell m}^2/(4\pi)}$ over the chosen degrees\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\paragraph{Still to reconcile.}
+The chapter's definition of topography (Eq.~\texttt{topo-definition}) must be checked against $h = w - N$ with $w$ from $q = (\rho_{\mathrm{LAB}}-\rho_w)gw + \dots$, which in the project notes is written $h = -\tau_b/(\Delta\rho\,g_0)$ with $\tau_b$ in tension: with $\tau_b = \sigma_{rr}$ at the flow top and $q=-\sigma_{rr}$, the two agree in sign only. They differ by $g$ versus $g_0$ and by the $-N$ term in $h=w-N$ (a few per cent at low degree).

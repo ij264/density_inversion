@@ -1,0 +1,79 @@
+### t5c_lith_depths
+
+[h_ref] repo G_w vs exact-sheet evaluation of the same sheets: 3.88e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.014  l36-50: 0.021
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.006  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.013  l36-50: 0.021
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+[w_dyn] repo G_w vs exact-sheet evaluation of the same sheets: 4.27e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.002  l5-10: 0.004  l11-20: 0.008  l21-35: 0.014  l36-50: 0.020
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.005  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.002  l5-10: 0.004  l11-20: 0.007  l21-35: 0.013  l36-50: 0.019
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+dMoho            mean depth   22.9 km (range   8.8- 68.5):  l2-4: 0.007  l5-10: 0.016  l11-20: 0.031  l21-35: 0.056  l36-50: 0.076
+dLAB             mean depth  104.8 km (range  47.7-300.0):  l2-4: 0.027  l5-10: 0.073  l11-20: 0.144  l21-35: 0.210  l36-50: 0.285
+drho crust       mean depth   12.7 km (range   5.4- 31.8):  l2-4: 0.004  l5-10: 0.009  l11-20: 0.019  l21-35: 0.034  l36-50: 0.051
+drho lid node 0  mean depth   22.9 km (range   8.8- 68.5):  l2-4: 0.007  l5-10: 0.014  l11-20: 0.027  l21-35: 0.049  l36-50: 0.067
+drho lid node 1  mean depth   65.2 km (range  57.9- 84.3):  l2-4: 0.003  l5-10: 0.006  l11-20: 0.011  l21-35: 0.020  l36-50: 0.028
+drho lid node 2  mean depth  107.4 km (range  99.6-111.9):  l2-4: 0.002  l5-10: 0.003  l11-20: 0.006  l21-35: 0.011  l36-50: 0.016
+compensated dMoho           : l2-4: 0.494  l5-10: 0.551  l11-20: 0.560  l21-35: 0.571  l36-50: 0.654
+compensated dLAB            : l2-4: 0.286  l5-10: 0.402  l11-20: 0.395  l21-35: 0.339  l36-50: 0.292
+compensated drho lid node 1 : l2-4: 0.059  l5-10: 0.072  l11-20: 0.071  l21-35: 0.070  l36-50: 0.064
+fully own-depth dMoho           : l2-4: 0.567  l5-10: 0.601  l11-20: 0.605  l21-35: 0.612  l36-50: 0.722   |N| rms 0.000 m per unit-rms u
+fully own-depth dLAB            : l2-4: 0.281  l5-10: 0.402  l11-20: 0.394  l21-35: 0.340  l36-50: 0.295   |N| rms 0.000 m per unit-rms u
+fully own-depth drho lid node 1 : l2-4: 0.082  l5-10: 0.091  l11-20: 0.090  l21-35: 0.091  l36-50: 0.093   |N| rms 0.099 m per unit-rms u
+### t3b_truncation
+
+[h_ref] repo G_w vs exact-sheet evaluation of the same sheets: 3.88e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.014  l36-50: 0.021
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.006  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.013  l36-50: 0.021
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+[w_dyn] repo G_w vs exact-sheet evaluation of the same sheets: 4.27e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.002  l5-10: 0.004  l11-20: 0.008  l21-35: 0.014  l36-50: 0.020
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.005  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.002  l5-10: 0.004  l11-20: 0.007  l21-35: 0.013  l36-50: 0.019
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+l= 2: in-band residual mass / root mass: repo 0.006, fine-w 6.0e-12;  |N_repo - N_fine|/|N_fine| = 0.229
+l= 6: in-band residual mass / root mass: repo 0.005, fine-w 4.8e-12;  |N_repo - N_fine|/|N_fine| = 0.134
+l=12: in-band residual mass / root mass: repo 0.006, fine-w 5.2e-12;  |N_repo - N_fine|/|N_fine| = 0.134
+l=24: in-band residual mass / root mass: repo 0.006, fine-w 5.1e-12;  |N_repo - N_fine|/|N_fine| = 0.105
+l=40: in-band residual mass / root mass: repo 0.008, fine-w 5.3e-12;  |N_repo - N_fine|/|N_fine| = 0.100
+reference geoid (Te=40, n=480): |N_repo - N_fine-w|/|N_fine-w| = 0.070; by band l2-4: 0.074  l5-10: 0.066  l11-20: 0.053  l21-35: 0.060  l36-50: 0.110
+### t4_reference
+
+[h_ref] repo G_w vs exact-sheet evaluation of the same sheets: 3.88e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.014  l36-50: 0.021
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.006  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.001  l5-10: 0.003  l11-20: 0.008  l21-35: 0.013  l36-50: 0.021
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+[w_dyn] repo G_w vs exact-sheet evaluation of the same sheets: 4.27e-15
+  repo vs exact lifted column (column   frame): rel diff by band: l2-4: 0.002  l5-10: 0.004  l11-20: 0.008  l21-35: 0.014  l36-50: 0.020
+  repo vs exact lifted column (sealevel frame): rel diff by band: l2-4: 0.001  l5-10: 0.003  l11-20: 0.005  l21-35: 0.010  l36-50: 0.017
+  mid-lid lumping alone (column frame):                 l2-4: 0.000  l5-10: 0.000  l11-20: 0.001  l21-35: 0.002  l36-50: 0.003
+  Moho at mean radius alone (column frame):             l2-4: 0.002  l5-10: 0.004  l11-20: 0.007  l21-35: 0.013  l36-50: 0.019
+  mean(moho below sea level) = 22.88 km, mean(t_c) = 20.44 km, mean(bed) = -2.44 km
+
+=== reference(): n_layers convergence (l>=2) ===
+ n=120: |N(n)-N(960)|/|N(960)| = 2.33e-03;  by band l2-4: 0.002  l5-10: 0.003  l11-20: 0.008  l21-35: 0.016  l36-50: 0.030
+ n=240: |N(n)-N(960)|/|N(960)| = 6.91e-04;  by band l2-4: 0.000  l5-10: 0.001  l11-20: 0.003  l21-35: 0.007  l36-50: 0.014
+ n=480: |N(n)-N(960)|/|N(960)| = 3.77e-04;  by band l2-4: 0.000  l5-10: 0.001  l11-20: 0.002  l21-35: 0.004  l36-50: 0.008
+ NET N_ref (structure + G_w h_ref): n=120 vs 960: l2-4: 0.112  l5-10: 0.123  l11-20: 0.106  l21-35: 0.118  l36-50: 0.162
+ NET N_ref (structure + G_w h_ref): n=240 vs 960: l2-4: 0.025  l5-10: 0.037  l11-20: 0.044  l21-35: 0.050  l36-50: 0.075
+ NET N_ref (structure + G_w h_ref): n=480 vs 960: l2-4: 0.014  l5-10: 0.019  l11-20: 0.023  l21-35: 0.031  l36-50: 0.043
+ compensation: |N_ref_net|/|N_structure| = 0.020
+ rms N_ref_net (m) = 7.217340473837711  rms structure-only = 356.7527054110613
+ column mass (n=120 midpoint) minus column_mass(): rms 124312.2 kg/m^2, max 304000.6  (column mass ~3.396e+08)
+
+=== linear lifted column with own-depth contrasts vs repo, NET reference geoid ===
+ repo net vs exact-linear net: l2-4: 0.061  l5-10: 0.128  l11-20: 0.120  l21-35: 0.119  l36-50: 0.134
+ repo net vs exact finite-amplitude net: l2-4: 0.036  l5-10: 0.065  l11-20: 0.063  l21-35: 0.065  l36-50: 0.078
+ exact-linear vs exact-finite: l2-4: 0.032  l5-10: 0.068  l11-20: 0.069  l21-35: 0.074  l36-50: 0.097

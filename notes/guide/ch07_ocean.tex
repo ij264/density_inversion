@@ -1,0 +1,132 @@
+\chapter{Extension 3: the real ocean and the sea-level constant}
+\label{ch:ocean}
+
+\section{The problem}
+
+The core model puts water everywhere; the plate of Chapter~\ref{ch:plate} puts it only in the oceans for the restoring force.
+But the water that follows the geoid also has to be confined to the oceans: on land, a rise of the geoid does not add water.
+Once that is so, the water's load and mass depend on $C(x)\,N(x)$, which couples degrees, and $N$ itself depends on the water.
+So the geoid and the water must be solved together.
+
+A second problem appears with real land and sea: what fixes absolute sea level?
+In the core model only anomalies matter.
+With a reference lithosphere and continents, the mean level of the ocean relative to the columns determines which areas are land and how high they stand, and a wrong mean produces a spurious land--ocean step.
+
+\section{How we tackle the ocean}
+
+The sea surface is an equipotential, so it follows the geoid: where the masses of the model raise the geoid by $N$ at sea, the water is $N$ deeper; on land nothing happens.
+This is the static version of the sea-level equation of glacial isostatic adjustment, in which the ocean also follows the geoid it helps to create.
+
+To first order the ocean that follows the geoid does two things at sea and nothing on land:
+\begin{itemize}[nosep]
+\item it loads the plate with its weight, $\delta q = -\rho_w g\,C N$;
+\item it adds its mass to the geoid as a sheet at sea level, $\delta N = S(R)\,\rho_w C N$.
+\end{itemize}
+Writing $r$ for the geoid the model computes before the ocean is added (the direct geoid of all masses, plus the geoid of the deflection under their load), the total geoid satisfies
+\begin{equation}
+    N = r + S(R)\,\rho_w C N - G_w P\,(\rho_w g\,C N)
+    \quad\Longleftrightarrow\quad
+    (I + T)\,N = r,
+    \qquad T = \rho_w\,(g\,G_w P - S(R))\,C,
+\end{equation}
+with $P$ the plate (load to deflection) and $G_w$ the geoid of the deflected column.
+Both effects depend on $N$ and both change it, which is why the equation is implicit.
+The water's own load and its own mass nearly cancel, as in the core model: the plate sinks under the water's weight by almost enough to remove an equal mass from the surface. So $T$ is small: its spectral radius is $0.0014$ at $L=50$.
+We solve by a Neumann series, $N = \sum_k (-T)^k r$, which converges in about four terms.
+The deflection is then $w = P(q - \rho_w g C N)$ and the observed topography, measured from sea level on land and at sea, $h = w - N$.
+
+\begin{defence}
+\Q{Is the self-gravitating ocean worth the trouble?}
+\A The water sheet is about \qty{7}{\percent} of the mantle geoid at degree 2, though its weight sinks the plate and cancels most of that in $N$; its larger effects are on $w$ (about \qty{2}{\percent} at degree 2) and through $h=w-N$, with $N/w$ about \qty{5}{\percent} at degree 2.
+Confining the water to the oceans also matters, because on land there is none.
+An earlier version that took the water term from flowkernels' free-surface geoid, applied it on land as well, and never added the water's mass to the geoid had the mantle geoid \qty{11}{\percent} low at degree 2.
+The fix is cheap and the limit test confirms it to $10^{-10}$.
+\end{defence}
+
+\section{How we tackle sea level}
+
+Every column has an absolute mass per unit area, $M(x)$, from its surface to the lid base, ice included.
+Heavy columns sit low and light columns stand high, but relative to what?
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=1cm,y=-1cm,font=\small]
+\fill[gray!15] (0,3.0) rectangle (10,5.2);
+\fill[blue!15] (3.6,1.2) rectangle (5.6,1.8);
+\fill[teal!25] (0.6,1.2) rectangle (2.6,4.2);
+\fill[teal!25] (3.6,1.8) rectangle (5.6,4.8);
+\fill[teal!25] (6.6,0.6) rectangle (8.6,3.6);
+\draw (0.6,1.2) rectangle (2.6,4.2); \draw (3.6,1.8) rectangle (5.6,4.8); \draw (6.6,0.6) rectangle (8.6,3.6);
+\draw[blue!70!black, dashed] (0,1.2) -- (10,1.2) node[right, font=\scriptsize] {sea level};
+\draw[dashed] (0,5.0) -- (10,5.0) node[right, font=\scriptsize] {depth $Z$};
+\node at (1.6,2.6) {$M = K$}; \node[font=\scriptsize] at (1.6,3.0) {at sea level};
+\node at (4.6,3.2) {$M > K$}; \node[font=\scriptsize] at (4.6,3.6) {heavy: ocean};
+\node at (7.6,2.0) {$M < K$}; \node[font=\scriptsize] at (7.6,2.4) {light: land};
+\node[font=\scriptsize] at (4.6,1.5) {water, $-w$ thick};
+\draw[-{Stealth}] (5.9,1.25) -- (5.9,1.75) node[midway,right,font=\scriptsize] {$w<0$};
+\draw[-{Stealth}] (8.9,1.15) -- (8.9,0.65) node[midway,right,font=\scriptsize] {$w>0$};
+\node[font=\scriptsize] at (5,5.45) {asthenosphere $\rho_{\mathrm{LAB}}$; equal pressure at $Z$; all columns of length $T$};
+\end{tikzpicture}
+\caption{The column balance behind the sea-level constant.}
+\end{figure}
+
+Compare columns of equal length on the same asthenosphere, and require equal pressure at a depth $Z$ below them (force up = force down).
+Under a column of mass $M$ whose surface is at height $w$ above sea level (positive up), the mass above $Z$ is
+\[
+    \underbrace{M}_{\text{column}} + \underbrace{\rho_w C\,(-w)}_{\text{water above}} + \underbrace{\rho_{\mathrm{LAB}}\,(Z - T + w)}_{\text{asthenosphere below}} .
+\]
+At sea $w<0$ and the water fills from the seafloor at $w$ up to sea level at 0, so its thickness is $-w$; on land $C=0$ removes the term.
+Equating with the reference column ($M = K$, $w = 0$) and cancelling $\rho_{\mathrm{LAB}}(Z-T)$:
+\begin{equation}
+    (\rho_{\mathrm{LAB}}-\rho_w C)\,w = K - M .
+\end{equation}
+$K$ is a single global number, the mass a column must have to float with its surface exactly at sea level.
+The per-column quantity is $K - M(x)$, the column's mass deficit or excess, and $w = (K-M)/(\rho_{\mathrm{LAB}}-\rho_w C)$ converts it into a height.
+
+A change $\Delta K$ is not a uniform shift: it moves columns by $\Delta K/2340$ at sea and $\Delta K/3370$ on land, because water fills an oceanic deflection but not a continental one.
+So a wrong $K$ creates a step between land and ocean.
+In the core model, with water everywhere, the contrast is uniform and the constant $b_0$ absorbs any change of $K$, so it is not needed there.
+The reference load is $q_{\mathrm{ref}} = -g(M - \langle M\rangle) + gK_0$: the mean column mass plus a constant.
+
+\begin{decision}{Fit the sea-level constant on columns that hold their whole lithosphere}
+\textbf{Choice.} $K_0$ is fitted, by least squares on the fine grid, to the observed bedrock elevation, using only columns whose WINTERC-G LAB is shallower than the column base.
+A perturbation $\delta K$, with prior standard deviation \qty{1e6}{kg/m^2}, is an unknown of the inversion.
+
+\textbf{Alternatives.} $K = \langle M\rangle$ (zero-mean load); fitting on all columns; conserving ocean mass.
+
+\textbf{Why.}
+\begin{itemize}[nosep]
+\item With $K = \langle M\rangle$ there was a \qty{705}{m} spurious land--ocean step and \qty{316}{m} rms leaking into all degrees.
+\item Where the LAB is deeper than the column base, the dense cold root is missing from $M$, so those columns are biased; fitting on them would push the constant to compensate.
+\item After the fit, thin-lithosphere oceans match the seafloor to \qty{2}{m}, and continents stand too high in proportion to their LAB depth (\qty{+0.07}{km} for LAB $<\qty{100}{km}$, rising to \qty{+0.87}{km} beyond \qty{200}{km}): exactly the missing roots, left for the mantle unknown.
+\end{itemize}
+The fitted value is $K_0 = \qty{-5.2e6}{kg/m^2}$ relative to $\langle M\rangle$, equivalent to the mean column standing about \qty{2.2}{km} below sea level with the ocean contrast ($K_0/(\rho_{\mathrm{LAB}}-\rho_w)$).
+
+\textbf{Under (b).} With the lid base following the LAB, cratons get their keels back and $K_0$ can be fitted on every column, which removes the restriction above.
+
+\textbf{Caveat.} $\delta K$ is nearly degenerate with the degree-0 Moho displacement (correlation close to $\pm1$; with the signs used here the data constrain $\delta K - f\,\delta\mathrm{Moho}_{00}$, which gives a correlation near $+1$, whereas the audit reported $-1$: check the parameterisation), and $K_0$ is fitted to the same elevation data the inversion uses.
+\end{decision}
+
+\section{How much each part matters}
+\begin{center}
+\small
+\begin{tabular}{p{0.28\textwidth}p{0.3\textwidth}p{0.32\textwidth}}
+\toprule
+& Self-gravitating ocean & Sea-level constant\\
+\midrule
+Question & how sea level varies with the geoid & where sea level is relative to the columns\\
+Size & \qtyrange{1}{2}{\percent} of $w$ at $\ell=2$, less above; about \qty{0.1}{\percent} of $N$ & essential: \qty{705}{m} land--ocean step without it\\
+Core model & simple closed form & not needed ($b_0$)\\
+Could it be deferred? & yes, stating its size; but it is already built and verified & not if the final inversion uses total topography on land\\
+\bottomrule
+\end{tabular}
+\end{center}
+If the self-gravitating ocean is neglected, two things that are not really part of it must stay: water only at sea in the plate's restoring force, and $h = w - N$, because topography is measured from sea level.
+
+\begin{incode}{\texttt{ocean.py} and \texttt{model.py}}
+\begin{itemize}[nosep]
+\item \texttt{SelfGravitatingOcean}: builds $T$ from $P$, $G_w$, $C$ and $S$, applies $(I+T)^{-1}$ by the Neumann series (\texttt{\_neumann}) and its adjoint the same way; \texttt{contraction} estimates the spectral radius by power iteration.
+\item \texttt{ForwardModel.sea\_level\_constant}: the least-squares $K_0$ on the fine grid with area weights.
+\item \texttt{ForwardModel.uniform\_load\_operator}: $\delta K \mapsto g\,\delta K$ as the degree-0 component (the orthonormal $Y_{00}$ is $1/\sqrt{4\pi}$, so a constant $c$ has component $c\sqrt{4\pi}$).
+\end{itemize}
+\end{incode}

@@ -10,12 +10,17 @@ from the four nearest columns.
 
 Fields (SI units; depths positive down from sea level, elevations positive up):
   bed_elevation   bedrock surface without ice (m)                     -ETOPO2_km_depth_Bed.xyz
-  ice_thickness   bedrock depth minus ice-surface depth, >= 0 (m)     ETOPO2_km_depth_Bed - Ice
+  ice_thickness   bedrock depth minus ice-surface depth, >= 0 (m)     ETOPO2_km_depth_Bed - Ice;
+                  zero where the ice floats (below)
+  floating_ice    1 where the ice floats (ice < 1 m excluded): rho_ice I < rho_w (-bed). A floating shelf and
+                  the water under it weigh what the same depth of open water does, so these cells are ocean
+                  (audit L5: the cavity had been counted as ice, and the restoring force as air)
   moho_depth      crust-mantle boundary (m)                           Global_Moho_WINTERC-G.xyz
   rho_crust       average crustal density, constant in depth          rho_c_out.xyz
-  rho_mantle      mantle density at the knots of mantle_depths below  rho_submoho_out.xyz, rho_{20..110}km_out.xyz
-  mantle_depths   the knot depths: Moho, 20, 36, 56, 80, 110 km; a knot above the Moho is moved to the Moho,
-                  as WINTERC-G's own layering does (README, layers 4-8); linear between knots
+  rho_mantle      mantle density at the knots of mantle_depths below  rho_submoho_out.xyz, rho_{20..400}km_out.xyz
+  mantle_depths   the knot depths: Moho, 20, 36, 56, 80, 110, 150, 200, 260, 330, 400 km; a knot above the Moho
+                  is moved to the Moho, as WINTERC-G's own layering does (README, layers 4-13); linear between
+                  knots. Knots below 110 km let the lid's base be moved deeper (audit fix 6).
   lab_depth       thermal lithosphere-asthenosphere boundary (m)      WINTERC-G_LAB.lis
   drho_lab        density just below the LAB minus just above (kg/m^3), from the 2 km profiles in
                   WINTERC-G_Density.lis: rho(LAB + 1 km) - rho(LAB - 1 km)
@@ -76,11 +81,15 @@ def main(src):
     ice_depth = half_degree(src / "ETOPO2_km_depth_Ice.xyz") * km
     bed = -bed_depth
     ice = np.maximum(bed_depth - ice_depth, 0.0)
+    floating = (ice > 1.0) & (bed < 0) & (910.0 * ice < 1030.0 * (-bed))
+    ice = np.where(floating, 0.0, ice)
     moho = half_degree(src / "Global_Moho_WINTERC-G.xyz") * km
     rho_c = half_degree(src / "rho_c_out.xyz")
-    names = ["submoho", "20km", "36km", "56km", "80km", "110km"]
+    names = ["submoho"] + [
+        f"{d}km" for d in (20, 36, 56, 80, 110, 150, 200, 260, 330, 400)
+    ]
     rho_m = np.stack([half_degree(src / f"rho_{n}_out.xyz") for n in names])
-    knots = np.array([0.0, 20, 36, 56, 80, 110]) * km
+    knots = np.array([0.0, 20, 36, 56, 80, 110, 150, 200, 260, 330, 400]) * km
     depths = np.maximum(knots[:, None, None], moho[None])
     depths[0] = moho
 
@@ -104,6 +113,7 @@ def main(src):
         lon=LON,
         bed_elevation=bed.astype(np.float32),
         ice_thickness=ice.astype(np.float32),
+        floating_ice=floating.astype(np.float32),
         moho_depth=moho.astype(np.float32),
         rho_crust=rho_c.astype(np.float32),
         rho_mantle=rho_m.astype(np.float32),
@@ -120,7 +130,7 @@ def main(src):
     print(
         f"area means: Moho {mean(moho) / km:.1f} km, crust {mean(rho_c):.0f} kg/m^3, LAB {mean(lab_depth) / km:.1f} km, "
         f"LAB jump {mean(drho_lab):.1f} kg/m^3 (range {drho_lab.min():.1f} to {drho_lab.max():.1f}), "
-        f"ice {ice.max() / km:.2f} km max, bed elevation {bed.min() / km:.1f} to {bed.max() / km:.1f} km"
+        f"ice {ice.max() / km:.2f} km max, floating ice {mean(floating) * 100:.2f} % of the area, bed elevation {bed.min() / km:.1f} to {bed.max() / km:.1f} km"
     )
 
 

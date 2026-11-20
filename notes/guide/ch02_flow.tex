@@ -1,0 +1,194 @@
+\chapter{Mantle flow and its kernels}
+\label{ch:flow}
+
+This chapter explains the part of the model that everything else rests on: how a density anomaly in the mantle produces a stress on the base of the lithosphere and a change in the gravitational potential.
+It is the part you wrote and understand best, so the aim here is to make explicit the choices that are easy to take for granted.
+
+\section{The equations}
+
+The mantle is treated as a viscous fluid at infinite Prandtl number: inertia is negligible, so at every instant the forces balance.
+We solve for the instantaneous flow driven by a density anomaly $\delta\rho_m$, with the viscosity $\eta(r)$ a function of radius only.
+The governing equations, linearised about a hydrostatic, spherically symmetric reference state $\rho_0(r)$, $g_0(r)$, are
+\begin{align}
+    \nabla\cdot\bm{\sigma} - \delta\rho\, g_0(r)\,\hat{\bm r} - \rho_0\nabla\phi_1 &= 0
+    && \text{(momentum: force up = force down)}, \label{eq:f-mom}\\
+    \nabla\cdot(\rho_0\bm u) &= 0
+    && \text{(mass, anelastic)}, \label{eq:f-mass}\\
+    \nabla^2\phi_1 &= 4\pi G\,\delta\rho
+    && \text{(Poisson, physics sign)}, \label{eq:f-poisson}
+\end{align}
+with $\bm\sigma = -p\bm I + \eta(\nabla\bm u + \nabla\bm u^{\mathsf T} - \tfrac23(\nabla\cdot\bm u)\bm I)$, stress positive in tension, and $\delta\rho$ the density anomaly.
+Compressibility enters through the anelastic mass equation, $\nabla\cdot(\rho_0\bm u)=0$, and the $-\tfrac23(\nabla\cdot\bm u)$ term in the stress; $\bm u$ is a velocity, so there is no advected density term in an instantaneous problem. (Check the exact form flowkernels solves before quoting this equation in the thesis.)
+
+Reading Equation~\eqref{eq:f-mom} as a force balance: the divergence of stress (the net viscous and pressure force on a parcel) holds up the parcel's extra weight $\delta\rho\,g_0$ and its weight in the perturbed gravity field $\rho_0\nabla\phi_1$.
+The last term is self-gravitation: the potential of the anomaly and of the boundaries it deflects acts back on the reference density.
+
+\begin{decision}{Compressible and self-gravitating}
+\textbf{Choice.} Keep the anelastic compressibility term and the self-gravitation term $\rho_0\nabla\phi_1$, following \citet{corrieu_mantle_1995}.
+
+\textbf{Alternatives.} The incompressible, non-self-gravitating Stokes problem of \citet{hager_lower_1985} and many later studies.
+
+\textbf{Why.} Both effects change the geoid kernel appreciably at low degree, which is exactly where the geoid has its power \citep{corrieu_mantle_1995,forte_viscous_1991}; self-gravitation matters most at degrees 2--3.
+(Quantify this yourself before quoting a number: run flowkernels with each term switched off.)
+Since the cost of including them in a sparse solver is negligible, there is no reason to leave them out.
+
+\textbf{Cost.} None numerically; the equations are longer, and comparison with incompressible studies needs care.
+\end{decision}
+
+\section{Boundary conditions}
+
+\paragraph{Free slip at the core--mantle boundary.}
+The outer core is an inviscid fluid, so it exerts no shear stress on the mantle: $\sigma_{r\theta}=\sigma_{r\varphi}=0$ and $u_r = 0$ at $r_{\mathrm{cmb}}$.
+The normal stress there is not zero; it is what deflects the CMB, and the deflected CMB is a mass anomaly that contributes to the geoid.
+
+\paragraph{Free slip at the top of the flow, $r_{\mathrm{top}} = R - \qty{105}{km}$.}
+The top of the flow domain is the base of the lithosphere.
+We impose $u_r=0$ and zero shear there, and record the normal stress $\sigma_{rr}(r_{\mathrm{top}})$: that is the stress the mantle exerts on the base of the lithosphere, which the lithosphere then has to balance.
+This is the classical way of computing dynamic topography \citep{hager_lower_1985,richards_geoid_1984}: solve with an undeformed boundary, then convert the normal stress into a deflection.
+It is exact to first order because the deflection is small compared with the wavelengths of interest.
+
+\begin{decision}{The top of the flow at \qty{105}{km}}
+\textbf{Choice.} The flow domain stops at \qty{105}{km} depth, and everything above is ``lithosphere'', which is carried by the flow and loaded by it but does not flow.
+
+\textbf{Alternatives.} Flow to the surface (as in \citet{hager_lower_1985}), with lateral viscosity variations representing plates; or a deeper base (\qtyrange{150}{200}{km}).
+
+\textbf{Why.}
+\begin{itemize}[nosep]
+\item Our observables are corrected for, or later model explicitly, the lithosphere, so the mantle model must stop where the lithosphere starts.
+\item The area-weighted mean depth of the WINTERC-G lithosphere--asthenosphere boundary is \qty{102}{km} and its median \qty{87}{km}, so \qty{105}{km} is a representative depth.
+\item The flowkernels grid has a node close to \qty{105}{km}, and the core model and the oceanic residual depths it is compared with are both defined relative to a lithosphere of roughly this thickness.
+\end{itemize}
+\textbf{Caveat.} About \qty{28}{\percent} of the Earth's area has a WINTERC-G LAB deeper than \qty{105}{km}, mostly beneath cratons.
+There, the lithospheric mantle below \qty{105}{km} is treated as mantle and its density as a mantle anomaly.
+This is consistent (it is within the flow domain and moves with it) but means the deepest lithosphere is not part of the lithospheric unknowns of Chapter~\ref{ch:lithosphere}.
+In the lid-base table of Chapter~\ref{ch:lithosphere}, moving the base to \qtyrange{150}{260}{km} changes the reference topography substantially, which is why the choice is stated explicitly.
+\end{decision}
+
+\section{Degree one and the reference frame}
+
+At degree 1 a density anomaly displaces the centre of mass of the mantle.
+Without a frame condition the problem is singular: a rigid translation of the whole Earth costs nothing.
+We work in the centre-of-mass frame of the whole Earth, in which the external potential has no degree-1 part.
+In flowkernels this is imposed by replacing the potential-matching row at the surface by $\Phi(b) = 0$ at degree 1.
+
+The consequence for the observables is simple.
+In this frame the degree-1 geoid is zero, $N_1=0$, but the degree-1 topography is not: the surface moves relative to the centre of mass, and that motion is a real, observable height difference between hemispheres.
+The deflection $w_1$ on its own depends on the frame, but $h_1 = w_1 - N_1$, a height measured from sea level, does not; in the centre-of-mass frame $N_1=0$, so there $h_1=w_1$.
+One subtlety: the zero-dipole condition is imposed in flowkernels with the deflected top's mass at $r_{\mathrm{top}}$; the core model moves that mass to $R$, where its dipole moment is larger by $(R/r_{\mathrm{top}})^3\approx1.05$, so the model's mass dipole is no longer exactly zero.
+
+\begin{defence}
+\Q{Why include degree 1 at all? Many studies drop it.}
+\A Degree 1 is part of the observed topography and our model predicts it.
+Dropping it throws away the hemispheric asymmetry of the data, which the inversion should be allowed to use or to fail to fit.
+The degree-1 kernels of flowkernels agree with the independent finite-element solver \texttt{fem\_1d} to a relative misfit of $10^{-4}$, so the prediction is reliable.
+Including it lowered the Bayes factor for topography from 39.0 to 35.2 (Chapter~\ref{ch:single}), so the degree-1 data on their own favour the null model by roughly 4 nats (roughly, because the hyperparameters are refitted): the scaling does not explain the degree-1 topography.
+
+\Q{Why is the degree-1 geoid zero?}
+\A Because we work in the centre-of-mass frame, in which the external field has no dipole by definition.
+The satellite geoid is also expressed in this frame, so the observed degree-1 coefficients are zero too.
+\end{defence}
+
+\section{The viscosity profile}
+
+The viscosity enters the kernels; the density does not depend on it, but what we infer about the density does.
+The reference profile has a factor-30 increase at \qty{670}{km}, an approximation to the jump inferred from the geoid by \citet{hager_lower_1985} and later studies \citep{king_masters_1992,rudolph_2015}.
+On the flowkernels grid the jump sits at the node nearest \qty{670}{km}, at \qty{666}{km}; the audit quotes an effective position of \qty{672}{km} (finding M6); check how that number was defined before quoting it.
+
+\begin{decision}{A factor-30 jump at \qty{670}{km} as the reference}
+\textbf{Choice.} Reference viscosity $\eta(r)$ uniform in the upper mantle, $\times 30$ below \qty{670}{km}.
+
+\textbf{Alternatives.} Factors of 10 and 100; a constant viscosity; profiles with a low-viscosity asthenosphere or a viscosity hill in the mid-mantle \citep{rudolph_2015}.
+
+\textbf{Why.} It is the most commonly used simple profile and sits in the middle of the range inferred from the geoid and glacial isostatic adjustment.
+More importantly, the inversion was repeated for factors 10, 30 and 100 and for constant viscosity: the log Bayes factor against the null varied only from 30 to 35 across them (in the earlier full-model run; still to be repeated with the core model), so the data do not strongly prefer any.
+
+\textbf{Caveat.} The recovered density does depend on the viscosity.
+How strongly is what the adjoint viscosity kernels of Section~3 of the chapter quantify.
+\end{decision}
+
+\section{Why a sparse boundary-value solver}
+
+The classical way to solve the radial equations for each degree is the propagator-matrix method: start at the CMB with unknown amplitudes, integrate the ODE system up to the surface, and match the boundary conditions there \citep{hager_lower_1985,corrieu_mantle_1995}.
+Its difficulty is that the fundamental solutions grow and decay as $r^{\pm\ell}$.
+Over the mantle, $r_{\mathrm{top}}/r_{\mathrm{cmb}} \approx 1.8$, so at degree 40 a growing solution increases by about $1.8^{40}\approx 10^{10}$ while a decaying one falls by about as much: the two differ by some 20 orders of magnitude, and matching boundary conditions means subtracting numbers of very different size.
+The resulting linear system is exponentially ill-conditioned with degree.
+
+flowkernels instead discretises the whole radial interval at once and solves the discrete equations, with all the boundary conditions, as one sparse linear system \citep{ascher_bvp_1995}.
+Each equation only couples neighbouring nodes, so the system is banded; its conditioning grows only algebraically with the number of nodes, not exponentially with degree. The number of nodes needed for a given accuracy still grows with degree (a deep, sharp anomaly at $\ell=40$ is \qty{9}{\percent} off on the present grid; Chapter~\ref{ch:assembly}), but that is a resolution question, not a loss of precision.
+
+\begin{defence}
+\Q{Why not propagator matrices, which are standard?}
+\A Because their conditioning grows exponentially with degree.
+Remedies exist (renormalisation, compound matrices) but they patch a problem that a global sparse solve does not have.
+We need degrees up to 40 for the topography, and the same code solves every degree with the same accuracy.
+
+\Q{How do you know the solver is right?}
+\A It agrees with \texttt{fem\_1d}, an independently written finite-element solver, to \qty{0.09}{\percent} for the topography kernels and \qty{0.1}{\percent} for the geoid kernels across degrees 1--40, and the limit tests in Chapter~\ref{ch:assembly} close to $10^{-10}$.
+\end{defence}
+
+\section{From traces to kernels}
+
+flowkernels returns, for each degree and for a unit density sheet at each radial node, five traces: the tangential velocity at the top, the normal stress and potential at the top, and the normal stress and potential at the bottom.
+From these we form the kernels.
+
+\paragraph{The load on the plate.}
+The normal stress at the top, $\sigma_{rr}(r_{\mathrm{top}})$, is non-dimensional in flowkernels; multiplying by $\eta_{\mathrm{ref}}/r_{\mathrm{top}}$ restores units of pascals.
+With stress positive in tension, $\sigma_{rr}>0$ means the material on either side of a horizontal surface pulls on the other, and $\sigma_{rr}<0$ means it pushes (in a fluid at rest $\sigma_{rr}=-p$, so a positive pressure is a negative $\sigma_{rr}$).
+The traction on a surface with outward normal $\hat{\bm n}$ is $\bm t = \bm\sigma\cdot\hat{\bm n}$; the base of the lithosphere faces down, $\hat{\bm n} = -\hat{\bm r}$, so the radial force per unit area on the lithosphere from the mantle is $t_r = -\sigma_{rr}$.
+The mantle therefore pushes up where $\sigma_{rr}<0$ (compression, above a rising hot anomaly) and pulls down where $\sigma_{rr}>0$ (tension, above a sinking dense one).
+This is the perturbation stress of the flow: the hydrostatic part that holds up the reference lithosphere has been removed.
+So the upward load is
+\begin{equation}
+    q = -\frac{\eta_{\mathrm{ref}}}{r_{\mathrm{top}}}\,\sigma_{rr}(r_{\mathrm{top}}),
+    \qquad K_q = -\frac{\eta_{\mathrm{ref}}}{r_{\mathrm{top}}}\,\sigma_{\mathrm{top}} .
+\end{equation}
+
+\paragraph{The geoid without the deflected top.}
+flowkernels' own geoid at the top of the shell, $K_N^{\mathrm{fk}}$, includes the mass of the deflected top boundary, placed at $r_{\mathrm{top}}$.
+In our model that mass is not at $r_{\mathrm{top}}$: the whole lithospheric column moves, and its mass change sits wherever the column's density contrasts are (at the surface in the core model).
+So we remove it.
+flowkernels' surface potential row reads $\Phi + c_{\mathrm{top}}\sigma_{rr} + (\text{CMB terms}) = (\text{attraction of the anomaly})$, where
+\begin{equation}
+    c_{\mathrm{top}} = \frac{4\pi G}{2\ell+1}\,\frac{r_{\mathrm{top}}}{g_{\mathrm{top}}}\,\rho_{\mathrm{ref}}
+\end{equation}
+is the self-gravity of the deflected top, written in flowkernels' own sign convention for $\Phi$ (as in the comment in \texttt{mantle.py}); its sign depends on that convention, which the limit test of Chapter~\ref{ch:geoid} confirms numerically to $10^{-10}$.
+Adding $c_{\mathrm{top}}\sigma_{\mathrm{top}}$ back to $\Phi_{\mathrm{top}}$ leaves the potential of the anomaly and of the deflected CMB alone.
+We then continue it upward to the surface as $(r_{\mathrm{top}}/R)^{\ell+1}$, the decay of an external potential field, and divide by surface gravity:
+\begin{equation}
+    K_N = \frac{\eta_{\mathrm{ref}}}{\rho_{\mathrm{ref}}\,r_{\mathrm{top}}\,g_{\mathrm{top}}}
+    \left(\Phi_{\mathrm{top}} + c_{\mathrm{top}}\sigma_{\mathrm{top}}\right)
+    \frac{g_{\mathrm{top}}}{g_0}\left(\frac{r_{\mathrm{top}}}{R}\right)^{\ell+1},
+    \qquad K_N = 0 \text{ at } \ell=1 .
+\end{equation}
+
+\begin{decision}{Remove the top's mass from flowkernels' geoid and put it back where the column puts it}
+\textbf{Choice.} Use $K_N$ (anomaly and CMB) and add the deflected column's mass separately, at the surface in the core model and at each density contrast in the full model.
+
+\textbf{Alternative.} Use flowkernels' geoid $K_N^{\mathrm{fk}}$ directly, which puts the compensating mass at \qty{105}{km}.
+
+\textbf{Why.} The geoid of a compensated anomaly is the small difference between the anomaly's attraction and that of its compensating mass, so it is very sensitive to where the compensating mass sits.
+Using $K_N^{\mathrm{fk}}$ in the core model gave a geoid wrong by factors of 0.2 to 3 at low degree, compared with the full model.
+Moving the mass to the surface removed the discrepancy (Chapter~\ref{ch:core}).
+\end{decision}
+
+\paragraph{Quadrature in radius.}
+The observables are integrals over depth, Equation~\eqref{eq:p-kernels}, computed with trapezoid weights on the kernel grid.
+The density, and so the integrand, can be discontinuous at the viscosity jump, so the grid is split there: the node on the jump is listed twice, once as the top of the lower layer and once, nudged up by a relative $10^{-12}$, as the bottom of the upper layer, and each layer gets its own trapezoid weights.
+A density step aligned with the jump is then not smeared across it (the trapezoid rule is exact only for an integrand linear within each layer).
+
+\begin{incode}{\texttt{src/density\_inversion/forward/mantle.py}, \texttt{MantleFlow.\_kernels}}
+For each degree $\ell = 1,\dots,L$ the function calls \texttt{fk.solve\_degree\_traces(shell, l)} and builds
+\begin{itemize}[nosep]
+\item \texttt{K\_q} $= -(\eta_{\mathrm{ref}}/r_{\mathrm{top}})\,\sigma_{\mathrm{top}}$: the load on the plate, \si{Pa} per (\si{kg/m^3} per m of sheet);
+\item \texttt{K\_h0}: flowkernels' own water-loaded free-surface topography, kept for comparison only;
+\item \texttt{K\_N}: the geoid of the anomaly and the CMB, continued to the surface, zero at $\ell=1$;
+\item \texttt{K\_N\_fk}: flowkernels' geoid including the top at \qty{105}{km}, kept for the limit test;
+\item \texttt{K\_m\_top}: the mass per unit area of the deflected top.
+\end{itemize}
+It then splits the trapezoid weights at the viscosity jump (raising an error if there is none) and caches everything to an \texttt{.npz} file keyed on the viscosity, LAB depth and $L$.
+The kernels are used as
+\begin{lstlisting}
+q_lm = sum_r weights * K_q[l-1] * drho_lm(r)
+\end{lstlisting}
+which is exactly the quadrature of Equation~\eqref{eq:p-kernels}.
+\end{incode}

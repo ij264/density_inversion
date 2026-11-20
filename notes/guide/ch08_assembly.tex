@@ -1,0 +1,93 @@
+\chapter{Assembly and verification}
+\label{ch:assembly}
+
+\section{The full operator}
+
+The full model maps four unknowns to two observables:
+\[
+    (\delta\rho_m,\ x_L,\ h_s,\ \delta K)\ \longmapsto\ (h,\ N) .
+\]
+For each source $X$ of load (mantle density, lithospheric unknowns, the sea-level constant), with load operator $L_X$ and direct geoid $D_X$,
+\begin{align}
+    N_X &= (I+T)^{-1}\left(D_X + G_w P L_X\right) && \text{the geoid, ocean included},\\
+    w_X &= P\left(L_X - \rho_w g\,C N_X\right) && \text{the deflection under its load and the water's},\\
+    h_X &= w_X - N_X && \text{topography from sea level},
+\end{align}
+and $h = \sum_X h_X x_X + h_s + h_{\mathrm{ref}}$, $N = \sum_X N_X x_X + N_{\mathrm{ref}}$.
+The reference terms $(h_{\mathrm{ref}}, N_{\mathrm{ref}})$ are the same equations applied to WINTERC-G's own load and structure: they are the fixed offset of the affine forward model.
+The surface field $h_s$ is added to the topography with no load and no geoid: it is a nuisance field for short-wavelength topography that the long-wavelength model is not meant to explain, separated from the rest only by its prior, which puts its power at high degree.
+
+\begin{incode}{\texttt{src/density\_inversion/forward/model.py}, \texttt{ForwardModel}}
+\begin{itemize}[nosep]
+\item \texttt{model\_space}, \texttt{data\_space}: direct sums of pygeoinf spaces, labelled.
+\item \texttt{forward(x)}: $(h, N)$ including the offsets; \texttt{offset()}: the offsets alone.
+\item \texttt{parts(x)}: every contribution separately (topography by source, geoid by mass), which sum to \texttt{forward}.
+\item Each block is a pygeoinf \texttt{LinearOperator} with an adjoint, so the posterior can be computed matrix-free; the adjoints are consistent to $1.3\times10^{-11}$.
+\end{itemize}
+\end{incode}
+
+\section{The verification}
+
+Each check compares the code with something it does not share code with.
+
+\begin{center}
+\begin{longtable}{p{0.33\textwidth}p{0.42\textwidth}r}
+\toprule
+Check & Against & Agreement\\
+\midrule
+\endhead
+Sheet factor $S_\ell$, force balances & symbolic derivation (sympy) & $3\times10^{-15}$\\
+Core model & closed form & $4\times10^{-14}$\\
+Topography kernels, $\ell=1$--40 & \texttt{fem\_1d}, separate finite-element code & \qty{0.09}{\percent}\\
+Geoid kernels, $\ell=1$--40 & \texttt{fem\_1d} & \qty{0.1}{\percent}\\
+Degree 1 & \texttt{fem\_1d} at $\ell=1$ & $10^{-4}$\\
+Full model in the core limit & flowkernels' $K_N^{\mathrm{fk}}$, $K_{h0}$ & $10^{-10}$\\
+Plate & manufactured solution & $10^{-9}$\\
+Lithospheric load & Airy isostasy & \qty{0.06}{\percent}\\
+Variable-depth sheets & brute-force integration & $10^{-9}$\\
+Moved mass & mass balance (load = geoid sheets) & $10^{-9}$\\
+Reference column & exact column mass & $10^{-12}$\\
+Grid quadrature & refinement to $8L$ & \qty{0.2}{\percent}\\
+Adjoints & $\langle Ax, y\rangle = \langle x, A^*y\rangle$ & $1.3\times10^{-11}$\\
+Compensated root geoid & brute-force axisymmetric code & \qty{3}{\percent}\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The last row is the weakest.
+The brute-force code solves the Airy balance column by column and integrates Newton's law numerically, sharing nothing with the package.
+The cause of the \qty{3}{\percent} gap ($-0.240$ against $-0.248$\,m) has not been established.
+Planar versus spherical mass balance is one candidate, but in the audit case it changed the result by about \qty{15}{\percent} ($-0.254$ against $-0.219$\,m), which is not obviously consistent with a \qty{3}{\percent} gap.
+Until the gap is shown to shrink with resolution, describe it as an unexplained \qty{3}{\percent} disagreement, not rounding error.
+
+\section{The approximations}
+
+\begin{center}
+\begin{longtable}{p{0.4\textwidth}p{0.45\textwidth}}
+\toprule
+Approximation & Size\\
+\midrule
+\endhead
+Covariant flat plate vs thin shell & $<10^{-4}$ in $F_\ell$ for $\ell\le50$\\
+Membrane stresses neglected & \qtyrange{0.2}{0.4}{\percent}\\
+One $g$ in the plate and loads & \qty{0.4}{\percent} at sea\\
+Radial grid of the flow kernels & $6\times10^{-4}$; up to \qty{9}{\percent} for a deep anomaly at $\ell=40$\\
+First-order lithosphere & \qty{4}{\percent} at $\ell=50$ for \qty{10}{km}; cross terms \qtyrange{3}{11}{\percent}\\
+Lid base fixed at \qty{105}{km} & cratons \qty{+865}{m} too high in the reference\\
+One crustal layer & up to \qty{1.3}{m} of geoid\\
+Ice density 910 vs 950 & documented\\
+Phase-boundary deflections (410, 660) & not modelled; raised by a referee report\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\begin{defence}
+\Q{Your radial grid converges only to first order. Is that a problem?}
+\A For the topography and for degrees up to about 10 the kernels are converged to $6\times10^{-4}$.
+For deep, sharp anomalies at high degree the error reaches \qty{9}{\percent}, but those combinations produce almost no surface signal.
+Refinement or Richardson extrapolation is the remedy if they become important.
+
+\Q{What about the 410 and 660 phase transitions?}
+\A Their deflections are mass anomalies that the model does not represent explicitly.
+To first order they behave like additional density sheets at those depths, which the mantle unknown can partly absorb; whether the prior allows it is something to test with synthetics.
+\end{defence}

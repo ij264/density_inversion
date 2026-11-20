@@ -1,0 +1,277 @@
+\chapter{Extension 2: the lithosphere as an unknown}
+\label{ch:lithosphere}
+
+\section{The problem with corrected data}
+
+Residual depths are the seafloor with the lithosphere's own contribution removed: the cooling plate, sediments and crust are corrected for empirically, and what remains is assigned to the mantle.
+That correction has two weaknesses.
+\begin{itemize}[nosep]
+\item On the continents there is no equivalent of the age--depth relation, so there is no residual topography to invert; the crust and lithospheric mantle have to be modelled.
+\item The corrections carry uncertainties that are correlated with the mantle signal we want (thick crust and thick, cold lithosphere tend to sit over fast mantle), and once subtracted they are not in the error budget.
+\end{itemize}
+The same issue affects the geoid, where the crustal correction is the dominant source of error, larger than the satellite gravity model's.
+
+\section{How we tackle it}
+
+We make the lithosphere part of the model.
+Its structure is written as a reference model, WINTERC-G \citep{fullea_winterc_2021}, plus perturbations that are unknowns of the inversion:
+\begin{itemize}[nosep]
+\item $\delta\mathrm{Moho}(x)$, the displacement of the Moho, positive up;
+\item $\delta\rho_c(x)$, a perturbation of the crust's density, uniform in depth;
+\item $\delta\rho_{\ell,n}(x)$, $n=1,2,3$, perturbations of the lithospheric mantle's density at three Gauss--Lobatto--Legendre nodes across the lid, interpolated in depth by quadratic Lagrange polynomials.
+\end{itemize}
+The data become the total topography (bedrock elevation, water-loaded at sea), so nothing is corrected away; what used to be the correction is now a forward-modelled term with its own prior.
+
+\section{The load of a perturbed column}
+
+The plate is thin, so the load a lithospheric perturbation puts on it is the weight of the extra mass in the column, wherever in the column the mass sits.
+Moving interface $i$ up by $\delta r_i$ replaces the material above it by the material below it over a height $\delta r_i$, adding mass $\Delta\rho_i\,\delta r_i$ per unit area, with $\Delta\rho_i = \rho_{\mathrm{below}} - \rho_{\mathrm{above}}$.
+A density perturbation in a layer adds its integral over the layer.
+Extra mass pushes down, so
+\begin{equation}
+    q_L(x) = -g\left[\sum_j \int_{\text{layer } j}\delta\rho_j\,\mathrm{d}r + \sum_i \Delta\rho_i\,\delta r_i\right] .
+\end{equation}
+Products of perturbations are dropped.
+
+\paragraph{Where the two terms come from.}
+The mass per unit area of a layered column is $M = \sum_j \int_{r_{j,\mathrm{bot}}}^{r_{j,\mathrm{top}}} \rho_j\,\mathrm{d}r$.
+Perturbing it by Leibniz's rule gives a term from changing the integrand and a term from moving the limits:
+\[
+    \delta M = \sum_j \int_{\text{layer } j} \delta\rho_j\,\mathrm{d}r
+    + \sum_j \Big[\rho_j(r_{j,\mathrm{top}})\,\delta r_{j,\mathrm{top}} - \rho_j(r_{j,\mathrm{bot}})\,\delta r_{j,\mathrm{bot}}\Big].
+\]
+Each interface is the top of the layer below and the bottom of the layer above, so the boundary terms collect into $\Delta\rho_i\,\delta r_i$ at each interface.
+Physically:
+\begin{itemize}[nosep]
+\item \textbf{the first term is the rock changing}, at fixed geometry: temperature ($\delta\rho\approx-\rho\alpha\,\delta T$; a lid \qty{100}{K} colder is about \qty{10}{kg/m^3} denser), composition (depleted cratonic mantle is lighter, mafic crust denser) or phase (eclogite);
+\item \textbf{the second term is the layers changing thickness}, at fixed materials: a thickened crust (light crust replaces dense mantle, so the column floats higher) or a thinned one.
+\end{itemize}
+Topography sees only their sum, $\delta M$; the geoid sees where the mass sits, so it can partly separate them, and the priors do the rest.
+The two terms do not double count: $\delta\rho_j$ is defined on the reference geometry, and the density change inside a slab swept by a moving boundary is second order.
+
+Every summand is therefore a field on the sphere multiplied by a known \emph{factor field} $f(x)$, the reference structure's contribution:
+\begin{align*}
+    f_{\delta\mathrm{Moho}}(x) &= \rho_{\mathrm{lid,top}}(x) - \rho_c(x) && \text{(contrast across the Moho)},\\
+    f_{\delta\rho_c}(x) &= t_c(x) && \text{(crustal thickness)},\\
+    f_{\delta\rho_{\ell,n}}(x) &= \tfrac12\,\omega_n\,t_\ell(x) && \text{(GLL weight times half the lid thickness)},
+\end{align*}
+and $q_L = -g\sum_k f_k(x)\,u_k(x)$, where $u_k(x)$ is the $k$-th unknown field (not $u_k$ times $x$):
+\begin{center}
+\small
+\begin{tabular}{clll}
+\toprule
+$k$ & unknown $u_k(x)$ & factor $f_k(x)$ & product $f_k u_k$\\
+\midrule
+1 & $\delta\mathrm{Moho}$ (m) & $\rho_{\mathrm{lid,top}}-\rho_c$ (\si{kg/m^3}) & mass of crust swapped for mantle\\
+2 & $\delta\rho_c$ (\si{kg/m^3}) & $t_c$ (m) & extra mass of the crust\\
+3--5 & $\delta\rho_{\ell,n}$ (\si{kg/m^3}) & $\tfrac12\omega_n t_\ell$ (m) & extra mass of the lid, node $n$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The factors vary with position because the reference does: the same $\delta\rho_c$ weighs five times more under a \qty{35}{km} continental crust than under \qty{7}{km} of oceanic crust.
+In harmonic space a product with $f(x)$ couples degrees, so each block is a multiplication operator, applied on a Gauss--Legendre grid.
+
+\paragraph{Isostasy as a check.}
+With no plate strength, the column floats where $(\rho_{\mathrm{LAB}}-\rho_w C)\,w = -(\text{extra mass})$.
+For a thickened crust, moving the Moho down by $t$ gives $w = (\rho_{\mathrm{lid}}-\rho_c)t/(\rho_{\mathrm{LAB}}-\rho_w C)$ up: Airy isostasy.
+The code reproduces this to \qty{0.06}{\percent}.
+
+\section{The reference structure and its frames}
+
+WINTERC-G gives, per \qty{1}{\degree} cell, the bedrock elevation, ice thickness, Moho depth, LAB depth and the density of the lithospheric mantle at knots in depth.
+Two frames are used, and keeping them apart avoids errors of the size of the elevation itself.
+\begin{itemize}[nosep]
+\item \textbf{Below sea level, $d_{\mathrm{sl}}$: where things are.} WINTERC-G stores its depths this way (it is built from data referenced to sea level), and the geoid needs the actual positions of masses, so every geoid sheet is placed in this frame.
+\item \textbf{Below the column's own surface, $d_{\mathrm{col}}$: how the mechanics moves things.} The column in the isostatic balance runs from its own surface down a fixed length $T$.
+\end{itemize}
+With bedrock elevation $b(x)$, positive up, $d_{\mathrm{col}} = d_{\mathrm{sl}} + b$:
+\begin{center}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Place & $b$ & Moho below sea level & Moho below surface & column base below sea level\\
+\midrule
+Tibet & \qty{+5}{km} & \qty{70}{km} & \qty{75}{km} & \qty{100}{km}\\
+Ocean & \qty{-4}{km} & \qty{11}{km} & \qty{7}{km} & \qty{109}{km}\\
+\bottomrule
+\end{tabular}
+\end{center}
+The plate lifts each column rigidly, so each column must be a fixed object: its surface and everything down to $T$ below it.
+The undeflected state is every column with its surface at sea level and its base on the flow top; lifting a column by $w$ raises surface and base together, so surface elevation equals $w$.
+The real Earth is this state deflected by the reference deflection, $w_{\mathrm{ref}}\approx b$.
+
+The two frames describe the same physics.
+Classical isostasy compares pressure at a common depth $Z$ below sea level; for a column with surface at $b$ and base at $T-b$,
+\[
+    P(Z) = g\big[M + \rho_{\mathrm{LAB}}(Z - T + b) - \rho_w C\,b\big],
+\]
+and requiring $P(Z)$ to be the same everywhere gives $(\rho_{\mathrm{LAB}}-\rho_w C)\,b = K - M$: the column-frame balance of Chapter~\ref{ch:ocean}.
+The column frame just packages it as the plate needs it: a column, its mass and its displacement.
+The code converts between the frames with $b(x)$ in one place, \texttt{lid\_intervals}.
+
+\begin{decision}{WINTERC-G as the reference lithosphere}
+\textbf{Choice.} WINTERC-G \citep{fullea_winterc_2021}, which fits seismic, topographic, gravity and heat-flow data jointly with a thermodynamically consistent model of the lithosphere.
+
+\textbf{Alternatives.} CRUST1.0 \citep{laske_crust1_2013} for the crust with a separate lithospheric model; LithoRef18.
+
+\textbf{Why.} It gives crust and lithospheric mantle density together, consistently, globally, at \qty{1}{\degree}, which is what the factor fields need.
+
+\textbf{Caveat (the important one).} WINTERC-G was itself fitted to elevation and the geoid.
+Using it as the prior mean is therefore partly circular: it is already close to the data, and the mantle term may appear smaller than it is.
+The inversion has to state which conclusions are immune (those carried by the mantle data alone, such as the oceanic residual depths) and test the effect of an alternative mean.
+\end{decision}
+
+\begin{decision}{Fields band-limited to degree 89}
+\textbf{Choice.} Each \qty{1}{\degree} field is projected onto harmonics up to degree 89 by exact cell averages, tapered with a Hann taper from degree 70 to 89, and evaluated as a band-limited field on the model's grids.
+
+\textbf{Why.} Point-sampling the \qty{1}{\degree} cells on a Gauss--Legendre grid aliases: the reference load was wrong by \qty{4.4}{\percent} at $3L$ and convergence was not monotone.
+After band-limiting, the error against $8L$ is \qty{0.2}{\percent} at $3L$, \qty{0.02}{\percent} at $4L$ and $6\times10^{-8}$ at $6L$.
+\end{decision}
+
+\begin{decision}{Ice density \qty{910}{kg/m^3}}
+WINTERC-G's README gives \qty{910}{kg/m^3}; \citet{fullea_winterc_2021} quote 950.
+We use 910, the README value, and note the discrepancy.
+\end{decision}
+
+\section{Why the LAB displacement was dropped}
+
+An earlier version also had $\delta\mathrm{LAB}$ as an unknown.
+It was removed, for three reasons found in the audit.
+\begin{enumerate}[nosep]
+\item Where the WINTERC-G LAB is deeper than \qty{105}{km} (\qty{28}{\percent} of the area), the LAB is inside the flow domain: a $\delta\mathrm{LAB}$ there was being applied as a lithospheric load and also given a geoid sheet, although that mass belongs to the mantle unknown.
+That is double counting.
+\item Where the LAB is inside the lid, $\delta\mathrm{LAB}$ and the lid density nodes describe the same thermal physics twice.
+\item The density contrast across the LAB is small (about \qty{8}{kg/m^3}), so the term carries little information.
+\end{enumerate}
+
+\section{Where the lid stops}
+
+\subsection{The current model: a fixed base}
+At present the lid base is fixed at $T = \qty{105}{km}$ below each column's own surface, the same depth as the top of the flow.
+In the sea-level frame it varies slightly ($T - b$: \qty{100}{km} under Tibet, \qty{109}{km} under deep ocean), but that is the reference deflection, not the LAB.
+So the model misassigns material in both directions:
+\begin{center}
+\small
+\begin{tabular}{p{0.2\textwidth}p{0.3\textwidth}p{0.4\textwidth}}
+\toprule
+Where & Reality & Model with fixed \qty{105}{km}\\
+\midrule
+Oceans (LAB \qtyrange{20}{100}{km}) & asthenosphere from the LAB to \qty{105}{km} & lid: rigid, isostatic, density from WINTERC-G\\
+Cratons (LAB \qtyrange{200}{260}{km}) & lithosphere from \qty{105}{km} to the LAB & mantle: flows, density from scaled tomography\\
+\bottomrule
+\end{tabular}
+\end{center}
+The craton case is the serious one: WINTERC-G's cratonic roots extend to \qtyrange{200}{260}{km}, and moving the base changes the reference topography a great deal:
+\begin{center}
+\begin{tabular}{rrr}
+\toprule
+Lid base $T$ (km) & Continental excess over cratons (m) & rms misfit (m) \\
+\midrule
+105 & $+865$ & 364 \\
+150 & $+381$ & 268 \\
+200 & $+162$ & 259 \\
+260 & $-9$ & 290 \\
+\bottomrule
+\end{tabular}
+\end{center}
+With $T=\qty{105}{km}$ the reference puts cratons too high, because the dense cold root below \qty{105}{km} is missing from the column; the mantle unknown then has to explain it, as if the keel were fluid driving flow.
+
+The fixed base was a simplification inherited from the core model, not a physical choice: with the lid ending exactly where the flow begins, every piece of density belongs to exactly one place without any masking, and for oceanic residual depths (LAB near or above \qty{105}{km}) it hardly matters.
+
+\subsection{Why the top of the flow must stay a sphere}
+flowkernels solves the Stokes equations one spherical-harmonic degree at a time.
+That is possible only because the boundaries are spheres and the viscosity depends on radius alone: each degree then evolves independently, as a 1D problem in radius.
+A flow top that followed $\mathrm{LAB}(x)$, or equivalently a stiff keel inside the sphere, is a lateral variation of viscosity: every degree couples to every other, and the problem needs a full 3D Stokes solver.
+For a fixed viscosity field the problem would still be linear in density; the costs are a 3D solve per column of the operator, the loss of the exact per-degree kernels on which the viscosity kernels rely, and a new uncertain input, the keel's viscosity.
+
+\subsection{The planned model: the lid base follows the LAB}
+\begin{decision}{Lid base $T(x) = \max(\qty{105}{km},\ \mathrm{LAB}(x))$, with a mask on the mantle density}
+\textbf{Choice.} Keep the top of the flow on the sphere at \qty{105}{km}.
+Let the lid base follow WINTERC-G's LAB where it is deeper, and set the mantle density to zero between the two:
+\[
+    \delta\rho_m(r,x) \;\to\; \big[1 - M(r,x)\big]\,\delta\rho_m(r,x),
+    \qquad M = 1 \text{ between } \qty{105}{km} \text{ and } T(x).
+\]
+The keel is then lithosphere: its density comes from WINTERC-G plus the lid unknowns, its weight is supported isostatically through the plate, and its mass enters the geoid as sheets at their own depths.
+The flow sees zero anomaly there.
+
+\textbf{Alternatives.}
+\begin{itemize}[nosep]
+\item Keep $T=\qty{105}{km}$ and report results as a function of $T$, or use WINTERC-G's density below \qty{105}{km} as the prior mean of $\delta\rho_m$.
+\item Mask the keel's density but do not give it to the lid. That asserts the keel has exactly PREM's density (the isopycnic hypothesis); any real keel signal is then credited to the mantle just below, the lid above or the correlated field. WINTERC-G suggests the keel is net dense (about \qty{+20}{kg/m^3} over \qtyrange{105}{250}{km}), though that density was tuned to gravity.
+\end{itemize}
+
+\textbf{Why.} It removes the double role of the keel, removes the thermal scaling of depleted keel material, and lets the sea-level constant be fitted on every column.
+It changes no solver: the lid thickness becomes $t_\ell(x) = T(x) - \mathrm{Moho}(x)$ (the GLL nodes already scale with thickness), \texttt{column\_mass} integrates to $T(x)$, the deflection and lid geoid sheets use the new base, and the mantle operator gets the mask.
+
+\textbf{Caveat.} Flow below \qty{105}{km} is not deflected around keels and the flow's push is applied at \qty{105}{km}, not at the keel's base: the remaining limitation is lateral viscosity.
+Oceanic asthenosphere above \qty{105}{km} is still treated as lid; raising the flow top to \qtyrange{50}{60}{km} would fix most of that (future work).
+
+\textbf{Checks.} Unchanged where the LAB is above \qty{105}{km}; Airy and mass balance with the deeper base; the craton excess should fall from $+865$\,m towards the $T=\qty{260}{km}$ value.
+\end{decision}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=0.9cm,y=-0.028cm,font=\small]
+\fill[gray!15] (0,105) rectangle (10,300);
+\fill[teal!20] (0,0) rectangle (10,105);
+\fill[pattern=north east lines, pattern color=teal!70!black] (5.2,105) -- (6.4,220) -- (10,220) -- (10,105) -- cycle;
+\draw[teal!60!black] (5.2,105) -- (6.4,220) -- (10,220);
+\draw[dashed] (0,80) -- (5,80) -- (5.2,105);
+\draw[orange!80!black, very thick, dash pattern=on 6pt off 3pt] (0,105) -- (10,105);
+\draw (0,0) -- (10,0);
+\foreach \x in {1.5,3.5} \draw[-{Stealth}, orange!80!black, thick] (\x,160) -- (\x,112);
+\node[above] at (2.5,0) {ocean};
+\node[above] at (7.6,0) {craton};
+\node at (2.5,40) {lid: isostatic, WINTERC-G + unknowns};
+\node[above, font=\scriptsize] at (1.6,80) {actual LAB $\approx\qty{80}{km}$};
+\node[fill=white, inner sep=1pt, font=\scriptsize] at (7.9,160) {keel: counted as lid in (b)};
+\node[below, font=\scriptsize] at (8.1,220) {LAB $\approx\qty{220}{km} = T(x)$};
+\node at (2.5,270) {mantle: flow kernels, $\delta\rho_m$};
+\node[right, font=\scriptsize, orange!80!black] at (10,105) {flow top, \qty{105}{km}};
+\node[right, font=\scriptsize] at (10,0) {surface};
+\end{tikzpicture}
+\caption{Option (b). The flow top stays the sphere at \qty{105}{km}; the lid base follows the LAB where it is deeper. The hatched keel moves from the mantle unknown to the lid; the mantle density is masked there.}
+\end{figure}
+
+\subsection{How WINTERC-G gets a laterally varying LAB}
+WINTERC-G solves each \qty{1}{\degree} column on its own: conductive temperature to the LAB, thermodynamic densities and velocities, and elevation from isostasy.
+Under isostasy a column needs only its own mass, so nothing couples it to its neighbours and the LAB can be anything at each point.
+It has no flowing mantle.
+Our lid works the same way, column by column, so a laterally varying LAB is just as easy there; that is (b).
+Only the top of the flow domain must be a sphere, and WINTERC-G has no flow domain.
+Neither model lets viscous flow go around a stiff keel.
+
+\section{Linearisation error}
+
+Products of perturbations are dropped.
+The size of what is dropped was measured.
+\begin{itemize}[nosep]
+\item A finite-amplitude correction to a deflected sheet scales as $(\ell+2)\,\delta h/(2r)$: about \qty{4}{\percent} at degree 50 for a \qty{10}{km} displacement.
+\item The cross term of a \qty{10}{km} Moho displacement and a \qty{30}{kg/m^3} crustal density change is \qtyrange{3}{11}{\percent} of the load (\qtyrange{70}{150}{m} of topography).
+\end{itemize}
+Both are documented; if the posterior moves the lithosphere far from WINTERC-G, the model should be relinearised about the posterior mean.
+
+\begin{defence}
+\Q{Why one crustal layer?}
+\A It keeps the number of unknowns small and matches what the data can resolve in the topography, where only the column mass matters.
+For the geoid it is a first-order limitation: moving \qty{100}{kg/m^3} between the upper and lower halves of the crust changes the geoid by about \qty{1.3}{m}, which a single uniform $\delta\rho_c$ cannot represent.
+The options are a second crustal node, or carrying that effect in the modelling-error covariance.
+
+\Q{Why three lid nodes?}
+\A Three GLL nodes represent a density that varies quadratically across the lid, which is enough to capture a thermal gradient and its curvature, and the quadrature is exact for it.
+The topography sees only the lid's integrated mass; the geoid sees its first moment; three nodes give the prior room for both without many unknowns.
+\end{defence}
+
+\begin{incode}{\texttt{src/density\_inversion/forward/lithosphere.py}}
+\begin{itemize}[nosep]
+\item \texttt{gll}, \texttt{lagrange}: the GLL nodes and weights, and the Lagrange basis on them.
+\item \texttt{project\_cells}, \texttt{synthesise}: \qty{1}{\degree} cells to tapered coefficients up to \texttt{BANDLIMIT\_LMAX = 89} (\texttt{TAPER\_FROM = 70}) and back to any Gauss--Legendre grid.
+\item \texttt{ReferenceLithosphere.structure}: thicknesses, contrasts and node weights at points.
+\item \texttt{factor\_fields}: $f_k(x)$ in the summand order of \texttt{summands}.
+\item \texttt{operator}: $(\delta\mathrm{Moho}, \delta\rho_c, \delta\rho_{\ell,n}) \mapsto q$, a row of multiplication operators.
+\item \texttt{column\_mass}, \texttt{lid\_intervals}: the exact mass of each reference column, integrating WINTERC-G's piecewise-linear density piece by piece.
+\item \texttt{reference\_load}: $q_{\mathrm{ref}} = -g(M - \langle M\rangle)$, the load of the reference structure itself.
+\item \texttt{ocean}: the ocean function with floating ice set to 1.
+\end{itemize}
+\end{incode}

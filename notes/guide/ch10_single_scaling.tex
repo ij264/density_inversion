@@ -1,0 +1,97 @@
+\chapter{The first inversion: a single 1D scaling}
+\label{ch:single}
+
+\section{The question}
+
+The simplest link between seismic tomography and density is a single radial scaling,
+\[
+    \delta\rho_m(r,x) = \rho_0(r)\,R(r)\,\mathrm{dlnV_s}(r,x),
+    \qquad R = \frac{\mathrm d\ln\rho}{\mathrm d\ln V_s},
+\]
+the same everywhere at a given depth.
+The question is whether such a scaling, applied to a modern tomography model, explains oceanic residual depths and the geoid, and with which $R(z)$.
+Its failure, if it fails, is the motivation for the perturbation formulation about WINTERC-G.
+
+\section{Why the old run was replaced}
+
+An earlier version of this inversion, using a forward operator built with the HC code, gave an oscillating $R(z)$ and $\chi^2/\nu\approx30$.
+Reviewing it showed:
+\begin{itemize}[nosep]
+\item its predicted topography for a plausible $R=0.25$ was 4.5--23 times too large and anticorrelated with the data ($r=-0.17$ to $-0.26$), too large in amplitude and of the wrong sign, so the oscillation was the fit fighting the operator;
+\item it included a flexural restoring term with $\rho_m-\rho_l = \qty{400}{kg/m^3}$, which is wrong for water-loaded seafloor;
+\item it used the posterior of the earlier chapter as data, which shrinks to zero where there are no data; predicting zero topography already scored 36.5 per degree of freedom;
+\item the HC output's Condon--Shortley phase is mislabelled in its docstring (it is $+1$), found by checking that cratons come out fast.
+\end{itemize}
+The rerun replaces it with the core model, the data points themselves, and the noise model of Chapter~\ref{ch:inversion}.
+
+\section{Set-up}
+
+\begin{itemize}[nosep]
+\item \textbf{Tomography.} SL2013sv \citep{schaeffer2013global} above \qty{660}{km}, S40RTS \citep{ritsema_s40rts_2011} below \qty{1008}{km}, with a $\cos^2$ taper between, on layers every \qty{100}{km}, rebuilt from the HC repository files (reproducing the saved blend to $6\times10^{-9}$).
+\item \textbf{Forward model.} The core model with the $\times30$ viscosity jump, degrees 1--31 (the tomography's maximum).
+\item \textbf{Topography.} Holdt's oceanic residual depths (7,434 cells), with the correlated field and $b_0$.
+\item \textbf{Geoid.} Degrees 2--25 of the geoid product, diagonal errors plus $\tau^2$ modelling error.
+\item \textbf{Prior.} $R(z)$ on 28 nodes, as in Chapter~\ref{ch:inversion}.
+\end{itemize}
+
+\section{Results}
+
+\begin{center}
+\begin{tabular}{lrp{0.5\textwidth}}
+\toprule
+Data & ln BF & $R(z)$ and fit\\
+\midrule
+Topography & $+35.2$ & $+0.08$ at \qty{105}{km}, $\approx0$ at \qtyrange{300}{400}{km}, $+0.18$ at \qtyrange{1700}{2000}{km}; variance reduction 0.22, correlation 0.46\\
+Geoid & $+96.4$ & oscillating; $-0.97\pm0.12$ at \qty{105}{km}; variance reduction 0.37\\
+Joint & $+10.8$ & smooth ramp $+0.01$ to $+0.15$; topography VR 0.12, geoid VR $-0.02$\\
+Rotation null (topography) & $-5.6$ to $-3.3$ & 6 rotations\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Without degree 1 the topography gives $+39.0$ and the joint $+13.8$, with similar $R(z)$.
+
+\section{Reading the results}
+
+\begin{enumerate}[nosep]
+\item \textbf{A 1D scaling of the tomography is strongly supported by the residual depths.}
+A log Bayes factor of 35 against the null, and $-3$ to $-6$ for rotated predictions, means the geography of the tomography matters.
+\item \textbf{But it explains only about a quarter of their variance, with small $R$.}
+Values of \numrange{0.05}{0.2} are smaller than those usually assumed for a purely thermal origin \citep[e.g.][]{karato1993importance,cammarano2003inferring}; check the ranges in those papers before quoting a comparison.
+\item \textbf{The geoid wants something quite different near the top.}
+A strongly negative $R$ at \qty{105}{km} would mean fast regions are \emph{light}.
+Taken literally, $R\approx-1$ means $\delta\rho/\rho\approx-\mathrm{dlnV_s}$, about \qty{-150}{kg/m^3} for a root \qty{5}{\percent} fast: far more than chemical depletion can supply (tens of \si{kg/m^3}).
+More likely the top node is absorbing something else: errors in the crustal and LAB corrections already applied to the geoid, or geoid structure a 1D scaling cannot fit.
+It is a symptom, not a measurement.
+\item \textbf{No single $R(z)$ serves both.}
+The joint fit is a compromise that explains none of the geoid.
+Our working hypothesis is that the conflict sits at the top of the mantle, where the lithosphere is; this is not yet demonstrated.
+A test would be a joint fit in which the geoid has its own $R$ at the \qty{105}{km} node, or one with that node removed: if the joint Bayes factor recovers, the conflict is at the top.
+\end{enumerate}
+This is the argument for the perturbation formulation: the lithosphere's density is not a fixed scaling of its velocity, so it must be modelled explicitly, and the mantle below it inverted as a perturbation.
+
+\begin{defence}
+\Q{A Bayes factor of 35 but only \qty{22}{\percent} variance explained: which is it?}
+\A Both.
+The Bayes factor measures whether the scaling helps relative to no mantle term, given the noise model; the variance reduction measures how much of the data it accounts for.
+A model can be decisively better than nothing and still leave most of the signal unexplained.
+
+\Q{Is the geoid's negative $R$ just an artefact of the oscillation?}
+\A The geoid-only $R$ does oscillate, and its fine structure should not be interpreted.
+Possibly. The posterior standard deviation at that node, 0.12, is small, but a small standard deviation on one node of an oscillating profile does not make it robust: it is conditional on the hyperparameters and on the noise model.
+Nor is $R\approx-1$ a natural mantle value: the isopycnic hypothesis \citep{jordan1978composition}, in which composition offsets temperature in cratonic roots, predicts $R\approx0$, not $-1$, and the reference lithosphere elsewhere in this guide suggests the deep roots are net dense.
+The safest reading is that the geoid alone cannot be fitted by a 1D scaling near the top, and the top node takes up the misfit.
+
+\Q{How robust is this to the viscosity and the tomography?}
+\A In the earlier full-model run, viscosity variants changed the log Bayes factor between 30 and 35 and tomography models between 17 and 21.
+Repeating these with the core model is on the to-do list.
+\end{defence}
+
+\begin{incode}{\texttt{scripts/single\_scaling/}}
+\begin{itemize}[nosep]
+\item \texttt{build\_core.py}: the core operator (Chapter~\ref{ch:core}).
+\item \texttt{invert\_core.py \{topo,geoid,joint\}}: thinning, geoid data, the \texttt{Joint} evidence, the fit, and the summary JSON.
+\item \texttt{rotate\_null.py}: the rotation null.
+\item Results: \texttt{outputs/single\_scaling/result\_core\_*.json} and \texttt{posterior\_core\_*.npz}; the no-degree-1 runs are kept with suffix \texttt{\_nodeg1}.
+\end{itemize}
+\end{incode}

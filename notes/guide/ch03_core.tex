@@ -1,0 +1,166 @@
+\chapter{The core model}
+\label{ch:core}
+
+The core model is the simplest model that is consistent with how oceanic residual depths are measured.
+It is what the first inversion (Chapter~\ref{ch:single}) uses, and every later stage reduces to it in a stated limit.
+If you can derive this chapter on a whiteboard, you can defend the first half of the thesis chapter.
+
+\section{The three assumptions}
+
+\begin{enumerate}[nosep]
+\item \textbf{The lithosphere has no strength.}
+It rides on the top of the flow and is lifted or lowered as a whole by $w$, with no bending stresses.
+\item \textbf{The ocean covers the whole surface and follows the geoid.}
+Sea level is an equipotential, so where the geoid rises by $N$ the water deepens by $N$.
+\item \textbf{The mass moved by the deflection sits at the surface.}
+When a column of lithosphere is lifted by $w$, asthenosphere of density $\rho_{\mathrm{LAB}}$ (PREM's density at the top of the flow, the material immediately below the column) flows into the gap at its base, and the column's top pushes water aside.
+The column itself is unchanged, so the mass above any fixed depth changes by $+\rho_{\mathrm{LAB}}w$ at the base and $-\rho_w w$ at the top.
+For any column, lifted rigidly, the changes at all its density contrasts telescope: the surface gives $(\rho_{\mathrm{top}}-\rho_w)w$, each internal contrast $(\rho_{\mathrm{below}}-\rho_{\mathrm{above}})w$, the base $(\rho_{\mathrm{LAB}}-\rho_{\mathrm{bottom}})w$, and the sum is always $(\rho_{\mathrm{LAB}}-\rho_w)w$.
+So the restoring force does not depend on the column's internal structure; only where the mass sits does, and that only matters for the geoid.
+``Density $\rho_{\mathrm{LAB}}$ throughout'' is the model's shorthand for where the moved mass goes, not a claim about real lithosphere: residual depths have had the cooling plate, sediments and crust removed, so the data treat the column's structure as accounted for.
+For real oceanic lithosphere it is close: the large contrasts are at the seafloor and at the Moho, within about \qty{7}{km} of the surface, while the lid grades into the asthenosphere.
+If the column's density is $\rho_{\mathrm{LAB}}$ throughout, the base swap is lithosphere for asthenosphere of the same density and changes nothing, so the whole change, $(\rho_{\mathrm{LAB}}-\rho_w)\,w$ per unit area, sits at the top of the column.
+We put it as a thin sheet at $r=R$, the undeflected top of the column; the mass really occupies $R$ to $R+w$, but the difference is second order.
+Keeping a separate sheet at the base would not help: for the uniform column it is zero. The tempting split, $+\rho_{\mathrm{LAB}}w$ at the base and $-\rho_w w$ at the top, is wrong: it forgets that the column itself moved, lifting in effect an empty column, and gives a spurious mass dipole in the geoid.
+(The real seafloor is \qtyrange{2}{6}{km} below sea level; putting the sheet at $R$ rather than there changes its geoid by under \qty{1}{\percent} at $\ell\le10$.)
+\end{enumerate}
+
+\begin{decision}{Why these three, for oceanic residual depths}
+Each assumption matches what the residual-depth data already assume.
+\begin{itemize}[nosep]
+\item Residual depths are \emph{water-loaded}: the depth anomaly is what it would be if the deflection were filled with water.
+That is assumption 2 at sea.
+\item Residual depths remove the plate's cooling, sediments and crust, i.e.\ the lithosphere's own structure, leaving a uniform column that only moves up and down: assumption 1 for the load, and assumption 3 for where its mass goes.
+\item The flexural strength of the oceanic plate matters only at wavelengths shorter than those we use: for $T_e=\qty{40}{km}$ flexure changes the deflection by about \qty{1}{\percent} at degree 30, \qty{3.5}{\percent} at degree 40, and negligibly below degree 20 (Chapter~\ref{ch:plate}).
+\end{itemize}
+So the core model is not a crude version of the full model: for this observable it \emph{is} the model, and the extra parts of the full model change the prediction by \qtyrange{1}{4}{\percent} (below).
+\end{decision}
+
+\section{The force balance}
+
+Consider a column of unit area at the top of the flow.
+The mantle pushes up on it with the load $q$ (from Chapter~\ref{ch:flow}).
+Lifting the column by $w$ costs weight in two ways.
+First, by Archimedes: the column now sits $w$ less deep in the mantle, losing buoyancy $\rho_{\mathrm{LAB}}\,g\,w$, and pushes $w$ further into the water, gaining buoyancy $\rho_w g\,w$.
+Equivalently, the mass above a fixed depth below the column has increased by $(\rho_{\mathrm{LAB}}-\rho_w)\,w$: dense rock is drawn in below and only light water is pushed aside above.
+The restoring force is therefore $(\rho_{\mathrm{LAB}}-\rho_w)\,g\,w$.
+Second, the sea surface has risen by $N$ (it follows the geoid), so the column carries an extra layer of water of thickness $N$, with weight $\rho_w g_0 N$.
+Force up = force down:
+\begin{equation}
+    q = (\rho_{\mathrm{LAB}}-\rho_w)\,g\,w + \rho_w\,g_0\,N .
+    \label{eq:c-force}
+\end{equation}
+Here $g$ is flowkernels' gravity at the top of the flow (\qty{9.91}{m/s^2}; integrating PREM gives about \qty{9.88}{m/s^2}) and $g_0$ at the surface (\qty{9.82}{m/s^2}).
+Strictly the water gained at the top sits at the surface, so its share of the restoring force should use $g_0$; we follow the plate code and use one $g$ for the column, an error of about \qty{0.4}{\percent} in the restoring force.
+The full model also weights the geoid-following water with $g$ rather than $g_0$, so the core model matches the full model's no-plate, all-ocean limit only to about $10^{-3}$, not exactly.
+None of these differences matters at the level of the data errors, but do not claim they are exact.
+
+\section{The geoid: four sources}
+
+The geoid at the surface is the sum of the potentials of every mass the model moves, divided by $-g_0$.
+There are four.
+\begin{enumerate}[nosep]
+\item \textbf{The density anomaly} in the mantle, $N^{\rho}$.
+\item \textbf{The deflected core--mantle boundary}, $N^{\mathrm{cmb}}$: the anomaly's flow pushes the CMB up or down, and the deflection is a sheet of mass $(\rho_{\mathrm{core}}-\rho_{\mathrm{mantle}})\,u_r$.
+\item \textbf{The moved lithospheric column}, a sheet of mass $(\rho_{\mathrm{LAB}}-\rho_w)\,w$ at the surface.
+\item \textbf{The water that follows the geoid}, a sheet $\rho_w N$ at the surface.
+\end{enumerate}
+The first two together are $D = N^{\rho}+N^{\mathrm{cmb}}$, from the kernel $K_N$ of Chapter~\ref{ch:flow}.
+
+\paragraph{The geoid of a surface sheet.}
+A thin sheet of surface density $\sigma_{\ell m}$ at radius $r$ has, outside it, the potential
+\begin{equation}
+    \Phi_{\ell m}(R) = -\frac{4\pi G r}{2\ell+1}\left(\frac{r}{R}\right)^{\ell+1}\sigma_{\ell m},
+\end{equation}
+which follows from solving Poisson's equation with a delta-function source and matching the potential and the jump in its gradient across the sheet.
+Dividing by $-g_0$ gives the geoid per unit surface density:
+\begin{equation}
+    S_\ell(r) = \frac{4\pi G\,r}{(2\ell+1)\,g_0}\left(\frac{r}{R}\right)^{\ell+1}, \qquad
+    S_\ell(R) = \frac{4\pi G R}{(2\ell+1)\,g_0}.
+\end{equation}
+At $\ell=2$, $S_2(R)\approx \qty{1.1e-4}{m}$ per \si{kg/m^2}: a degree-2 layer of water \qty{1}{m} thick ($\qty{1000}{kg/m^2}$) raises the geoid by about \qty{0.11}{m}.
+The water sheet itself is therefore not small; but because the column sinks under the water's weight, its net effect on $N$ nearly cancels (next section).
+
+The total geoid is
+\begin{equation}
+    N = D + S_\ell(R)\left[(\rho_{\mathrm{LAB}}-\rho_w)\,w + \rho_w N\right] .
+    \label{eq:c-geoid}
+\end{equation}
+
+\section{The closed-form solution}
+
+Equations~\eqref{eq:c-force} and~\eqref{eq:c-geoid} are two linear equations in two unknowns, $w$ and $N$, for each $(\ell,m)$.
+From Equation~\eqref{eq:c-force}, $(\rho_{\mathrm{LAB}}-\rho_w)\,w = (q-\rho_w g_0 N)/g$.
+Substituting into Equation~\eqref{eq:c-geoid}:
+\begin{align}
+    N &= D + S\left[\frac{q-\rho_w g_0 N}{g} + \rho_w N\right]
+       = D + \frac{S q}{g} + \rho_w S N\left(1-\frac{g_0}{g}\right), \\
+    N &= \frac{D + S q/g}{1 + \rho_w S\,(g_0/g - 1)} ,
+    \qquad
+    w = \frac{q - \rho_w g_0 N}{(\rho_{\mathrm{LAB}}-\rho_w)\,g} .
+\end{align}
+The denominator differs from 1 by $\rho_w S (g_0/g-1) \approx 10^{-3}$ at degree 2: the water's extra weight and its extra attraction almost exactly cancel, because when $g=g_0$ the column sinks under the extra water by just enough to keep the total mass at the surface unchanged.
+The water still matters, through the term $\rho_w g_0 N$ in the force balance, which changes $w$, and through $h=w-N$.
+
+\paragraph{What is observed.}
+Topography is measured from sea level, which is the geoid.
+The seafloor moves up by $w$ and sea level by $N$, so the observed depth anomaly is
+\begin{equation}
+    h = w - N .
+\end{equation}
+This matters most at low degree, where $N$ is a few per cent of $w$.
+
+\paragraph{Degrees 0 and 1.}
+Degree 0 is excluded: a uniform change of density changes the Earth's mass and radius, not its shape, and the residual depths are defined up to a constant, which the inversion fits separately ($b_0$).
+At degree 1 we are in the centre-of-mass frame (Chapter~\ref{ch:flow}), so $N_1 = 0$ and
+\begin{equation}
+    w_1 = \frac{q_1}{(\rho_{\mathrm{LAB}}-\rho_w)\,g}, \qquad h_1 = w_1 .
+\end{equation}
+
+\section{Evidence that the core model is right}
+
+\begin{defence}
+\Q{Why put the moved mass at the surface rather than at \qty{105}{km}?}
+\A Because that is where it is.
+Lifting a column by $w$ swaps rock for water at the top (the surface) and swaps lithosphere for asthenosphere at the base; if the column's density equals $\rho_{\mathrm{LAB}}$ throughout (which is what removing the lithosphere's own structure from the data amounts to), the base swap is zero and all of the change is at the top.
+Putting it at \qty{105}{km}, as flowkernels' own geoid does, changed the low-degree geoid by factors of 0.2 to 3, because the compensated geoid is a small difference of large terms.
+
+\Q{How do you know the simplifications don't matter?}
+\A We compared the core model with the full model (elastic plate, real ocean, lithosphere about WINTERC-G) at the oceanic data points for the same mantle.
+The predicted topographies correlate at $\ge 0.996$ and differ in amplitude by \qtyrange{1}{4}{\percent}; the geoids agree within about \qty{15}{\percent} at degrees 2--8, except near the sign change of the geoid kernel where both are small.
+The data errors are much larger than these differences.
+
+\Q{Why not use continental data with the core model?}
+\A Because on land there is no water in the deflection: the restoring force is $\rho_{\mathrm{LAB}}\,g\,w$, not $(\rho_{\mathrm{LAB}}-\rho_w)\,g\,w$.
+The water-loaded prediction overestimates the land deflection by $\rho_{\mathrm{LAB}}/(\rho_{\mathrm{LAB}}-\rho_w)\approx 1.44$.
+That is the problem the elastic plate on land and sea solves (Chapter~\ref{ch:plate}).
+
+\Q{Is the ocean term worth keeping?}
+\A Yes, though not for the reason one might first think.
+The water sheet is about \qty{7}{\percent} of the mantle geoid at degree 2, but its weight sinks the column by just enough to cancel almost all of that: its net effect on $N$ is about \qty{0.1}{\percent}.
+Its real effect is on the deflection: the extra water changes $w$ by $-\rho_w N/(\rho_{\mathrm{LAB}}-\rho_w)\approx -0.44N$, about \qty{2}{\percent} of $w$ at degree 2, and sea level enters the observable through $h=w-N$.
+\end{defence}
+
+\begin{incode}{\texttt{scripts/single\_scaling/build\_core.py}}
+\begin{enumerate}[nosep]
+\item Builds \texttt{MantleFlow} with the chosen viscosity, \texttt{lab\_depth=105e3}, \texttt{lmax=40}, and reads its kernels.
+\item Reads the tomography (dlnVs in per cent) and evaluates it on the kernel grid (\texttt{tomography\_at}, degree 0 zeroed, divided by 100), and the reference density $\rho_0$ (\texttt{rho0\_on\_kernel\_grid}).
+\item For each of the 28 depth nodes of $R(z)$, forms the density $\delta\rho = \rho_0\,B_i(z)\,\mathrm{dlnV_s}$ with the hat function $B_i$, and the load and direct geoid
+\begin{lstlisting}
+q[:, l, :l+1] = tensordot(K_q[l-1], f[:, :, l, :l+1], axes=(0, 0))
+D[:, l, :l+1] = tensordot(K_N[l-1], f[:, :, l, :l+1], axes=(0, 0))
+\end{lstlisting}
+where \texttt{f} already contains the quadrature weights.
+\item Applies the closed form:
+\begin{lstlisting}
+S = 4*pi*G*R / ((2*l + 1)*g0)
+N = (D + S*q/g_top) / (1 + rho_w*S*(g0/g_top - 1))
+w = (q - rho_w*g0*N) / ((rho_lab - rho_w)*g_top)
+N[:, 1, :] = 0;  w[:, 1, :] = q[:, 1, :] / ((rho_lab - rho_w)*g_top)
+h = w - N
+\end{lstlisting}
+\item Evaluates $h$ at every data point with orthonormal real harmonics (\texttt{harmonics\_at}, Condon--Shortley phase $+1$), giving a column of \texttt{G\_points}.
+\item Converts $N$ to the convention of the geoid product: multiplies order $m$ by $(-1)^m$ (Condon--Shortley phase $-1$) and by $(R/a)^{\ell-1}$ to refer it to the product's radius $a$, giving a column of \texttt{G\_geoid}.
+\end{enumerate}
+Each column is the prediction for $R(z) = B_i(z)$; the full prediction is \texttt{G\_points @ R}.
+\end{incode}

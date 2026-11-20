@@ -1,0 +1,41 @@
+\chapter*{How to use this guide}
+\addcontentsline{toc}{chapter}{How to use this guide}
+
+This guide explains, in more detail than a paper would, what the forward model of Chapter~3 does, why each modelling decision was taken, what the alternatives were, what evidence supports the choice, and where in the code each piece lives.
+It is written to be read alongside the chapter, not instead of it: the chapter states the model, and this guide is the reasoning behind it.
+
+Every chapter follows the same pattern.
+\begin{enumerate}[nosep]
+\item The theory, derived step by step, with every force balance written as \emph{force up = force down}.
+\item The decisions, each in a green box: what we chose, what else we could have done, and why.
+\item The defence, in an orange box: the questions an examiner is likely to ask, with the answer and the number that supports it.
+\item The code, in a blue box: which file and which function implement the step, and what they compute.
+\end{enumerate}
+
+Chapter~\ref{ch:ledger} collects every decision in one table, with its evidence and its caveat, and ends with the questions most likely to come up in a viva.
+If you read only one chapter before a meeting, read that one.
+
+\section*{The model in one page}
+
+We want the density of the mantle.
+We observe two things at the surface: the height of the seafloor (and, later, of the land), and the geoid.
+A density anomaly in the mantle makes the mantle flow; the flow pushes or pulls on the base of the lithosphere, which deflects the surface; and every mass that is displaced, the anomaly itself and the boundaries it deflects, changes the gravity field and so the geoid.
+All of this is linear in the density anomaly, so the forward problem is a linear operator, and with Gaussian priors and errors the inverse problem has an exact, analytic posterior.
+
+We build the forward model up in stages, making it more physical one assumption at a time; each stage can be checked against the one before by a forward comparison.
+\begin{enumerate}[nosep]
+\item \textbf{The core model} (Chapter~\ref{ch:core}): mantle flow below a lithosphere with no strength, covered everywhere by water that follows the geoid.
+It predicts oceanic residual depths and the geoid, and it is what the first inversion uses.
+\item \textbf{An elastic plate on land and sea} (Chapter~\ref{ch:plate}): the lithosphere bends, and the continents are dry.
+This is what lets continental data into the final inversion.
+\item \textbf{The lithosphere as an unknown} (Chapters~\ref{ch:lithosphere} and~\ref{ch:geoid}): the crust and lithospheric mantle become unknowns about a reference model, WINTERC-G, and the data become total topography.
+\item \textbf{The real ocean and the sea-level constant} (Chapter~\ref{ch:ocean}): water only where the oceans are, solved together with the deflection.
+\end{enumerate}
+Each stage reduces to the previous one in a stated limit, and the difference is measured, so each added piece of physics is justified by a number rather than by assertion.
+There are two inversions: the core model with oceanic residual depths and the geoid, and the full model with total topography and the geoid.
+The stages in between build the forward model; they are not inverted separately.
+
+\section*{What has been verified}
+Every equation in the forward model has been checked against something independent of the code that implements it: a closed-form solution, a symbolic derivation, a second solver written separately (\texttt{fem\_1d}), a brute-force numerical integral, or an exact conservation law.
+Chapter~\ref{ch:assembly} lists the checks and their results; the smallest disagreement is at the level of rounding error and the largest, for the geoid of a compensated root computed two entirely different ways, is \qty{3}{\percent}, a gap not yet explained.
+An independent audit of the physics and the code, and three simulated referee reports, found errors in the code, all fixed and described where they occur; a later independent review of this guide found and corrected errors in its explanations.

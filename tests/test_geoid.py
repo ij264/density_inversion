@@ -46,8 +46,11 @@ def test_sheet_at_the_surface_is_the_textbook_one(setup):
     assert np.all(deeper[l >= 2] < S[l >= 2])  # deeper mass, smaller geoid
 
 
-def test_mantle_kernel_plus_the_deflected_top_is_flowkernels_geoid(setup):
-    """Taking the deflected top out of flowkernels' geoid and adding it back as a sheet gives it back."""
+def test_top_sheet_identity_in_the_mantle_kernels(setup):
+    """An identity of mantle.py's algebra only: K_N plus the sheet of flowkernels' deflected top is
+    flowkernels' geoid. It does not go through the plate or the ocean; the full limit test, which does, is
+    test_ocean_reproduces_flowkernels_in_its_own_geometry in test_model.py (audit G9).
+    """
     mf, ref, geo, Q = setup
     k = mf.kernels
     l = np.asarray(k["degrees"], float)[:, None]
@@ -162,3 +165,81 @@ def test_deep_dense_anomaly_lowers_the_geoid_under_uniform_viscosity():
     w = apply(ElasticPlate.from_mantle(mf, Te=0.0).operator(Q), q)
     N = apply(geo.mantle_operator(X, Q), c) + apply(geo.deflection_operator(Q), w)
     assert N[4] < 0  # degree 2, order 0
+
+
+# ---------------------------------------------------------------- fix 4 (audit E2 / G2 / G3 / G4 / G5)
+
+
+def test_variable_radius_sheets_are_exact(setup):
+    """A sheet at a laterally varying depth, against the definition evaluated degree by degree:
+    N_lm = 4 pi G R / ((2l + 1) g0) [sigma (r / R)^(l + 2)]_lm."""
+    mf, ref, geo, Q = setup
+    H = ref._fine(Q)
+    LA, LO = ref._grid(H)
+    s = ref.structure(LA, LO)
+    depth, contrast = (
+        s["moho"],
+        s["drho_moho"],
+    )  # 9-68 km, the hardest lithospheric case
+    ones = H.from_components(geo._ones(H))
+    got = Q.to_components(geo.sheets(Q, [(depth, contrast)], W=H)(ones))
+    l = np.asarray(Q.degrees)
+    want = np.zeros(Q.dim)
+    for d in range(2, Q.lmax + 1):
+        field = contrast * ((geo.R - depth) / geo.R) ** (d + 2)
+        comp = H.to_components(H.from_grid_values(field))[: Q.dim]
+        want[l == d] = (4 * np.pi * geo.G * geo.R / ((2 * d + 1) * geo.g0) * comp)[
+            l == d
+        ]
+    assert np.allclose(got, want, rtol=0, atol=1e-9 * np.abs(want).max())
+
+
+def test_compensated_root_keeps_its_mass_balance_in_band(setup):
+    """Te = 0: the root's mass and the lifted column's must cancel at every degree the model keeps. With the
+    deflection truncated before it is multiplied by the column's contrasts they did not (0.5-0.8 % of the
+    root, which is 10-23 % of the compensated geoid)."""
+    mf, ref, geo, Q = setup
+    from density_inversion.forward.plate import OceanLoadedPlate
+
+    H = ref._fine(Q)
+    LA, LO = ref._grid(H)
+    A = ref.operator(Q)
+    P_H = OceanLoadedPlate.from_mantle(mf, Te=0.0, rtol=1e-13).operator(Q, W=H)
+    l = np.asarray(Q.degrees)
+    x = np.zeros(A.domain.dim)
+    i = ref.index("dMoho")
+    x[i * Q.dim : (i + 1) * Q.dim] = np.where(l == 12, -1e3, 0.0)
+    q = Q.to_components(A(A.domain.from_components(x)))
+    w = apply(P_H, q)
+    lifted = sum(c for _, c in geo.deflection_sheets(LA, LO))
+    moved = H.to_components(
+        H.from_grid_values(lifted * np.asarray(H.grid_values(H.from_components(w))))
+    )[: Q.dim]
+    root = -q / ref.g  # the root's mass, in band (its load is -g times it)
+    assert np.linalg.norm(moved + root) < 1e-9 * np.linalg.norm(root)
+
+
+def test_reference_layers_hold_the_column_mass(setup):
+    """The sheets that make the reference geoid carry exactly the mass that makes its load."""
+    mf, ref, geo, Q = setup
+    lat, lon = np.array([32.0, 0.0, 60.0, -80.0]), np.array([88.0, 200.0, 260.0, 120.0])
+    total = sum(m for _, m in geo.reference_layers(lat, lon))
+    assert np.allclose(total, ref.column_mass(lat, lon), rtol=1e-12)
+
+
+def test_reference_geoid_converges_in_quadrature(setup):
+    mf, ref, geo, Q = setup
+    a = geo.reference(Q)
+    b = geo.reference(Q, n_crust=12, n_piece=6, n_ice=4)
+    assert np.linalg.norm(a - b) < 1e-6 * np.linalg.norm(b)
+
+
+def test_deflection_frames_differ_only_by_the_surface_elevation(setup):
+    """The column frame is the sea-level frame moved up by the bed elevation, sheet by sheet."""
+    mf, ref, geo, Q = setup
+    lat, lon = np.array([32.0, 0.0]), np.array([88.0, 200.0])
+    bed = ref.sample("bed_elevation", lat, lon)
+    for (d1, c1), (d2, c2) in zip(
+        geo.deflection_sheets(lat, lon), geo.deflection_sheets(lat, lon, "column")
+    ):
+        assert np.allclose(d2, d1 + bed) and np.allclose(c1, c2)

@@ -1,0 +1,121 @@
+\chapter{The problem and the strategy}
+\label{ch:problem}
+
+\section{What we observe and what we want}
+
+The quantity we want is the density of the mantle, $\delta\rho_m(r,\theta,\varphi)$, measured as a departure from a radial reference model, PREM \citep{dziewonski1981preliminary}.
+It is a function of three dimensions.
+
+The quantities we observe are functions of two.
+\begin{itemize}[nosep]
+\item \textbf{Topography.} In the first inversion, the oceanic residual depths of \citet{holdt_densely_2022}: the depth of the seafloor below sea level, corrected for the cooling of the oceanic plate, for sediments and, where it is known, for the thickness of the crust, so that what remains is attributed to the mantle.
+Later, the total height of the bedrock above sea level, with the lithosphere modelled rather than corrected for.
+\item \textbf{The geoid.} The height of the equipotential surface that coincides with mean sea level, from the satellite gravity model GOCO06s \citep{kvas_goco06s_2021}, with the hydrostatic flattening of the rotating Earth removed \citep{chambat_flattening_2010}.
+\end{itemize}
+
+Both are expanded in spherical harmonics.
+For a mantle with radial viscosity, each harmonic of degree $\ell$ and order $m$ of the observables depends only on the same harmonic of the density, at every depth:
+\begin{equation}
+    h_{\ell m} = \int_{r_{\mathrm{cmb}}}^{r_{\mathrm{top}}} K^{h}_{\ell}(r)\,\delta\rho_{m,\ell m}(r)\,\mathrm{d}r,
+    \qquad
+    N_{\ell m} = \int_{r_{\mathrm{cmb}}}^{r_{\mathrm{top}}} K^{N}_{\ell}(r)\,\delta\rho_{m,\ell m}(r)\,\mathrm{d}r .
+    \label{eq:p-kernels}
+\end{equation}
+The kernels $K^{h}_\ell$ and $K^{N}_\ell$ are the response of the observable to a unit density sheet at radius $r$.
+Chapter~\ref{ch:flow} derives them.
+
+\section{Why this inverse problem is hard}
+
+Equation~\eqref{eq:p-kernels} has two consequences that run through everything that follows.
+
+\textbf{Each coefficient sees only a weighted depth average.}
+For each $(\ell,m)$ we observe at most two numbers, $h_{\ell m}$ and $N_{\ell m}$, but the unknown is a whole function of depth.
+Any density profile that is orthogonal to both kernels is invisible.
+The null space is therefore enormous, and the depth distribution of density can only come from prior information or from combining the two observables.
+
+\textbf{The geoid kernel changes sign.}
+A dense anomaly raises the geoid by its own attraction, but it also sinks, pulling the surface down and pushing the core--mantle boundary down, and those depressions lower the geoid.
+The two effects are of similar size, and which wins depends on depth, degree and viscosity.
+For shallow anomalies the surface depression, which is even shallower, wins and the kernel is negative; with a stiffer lower mantle the anomaly can win at depth and the kernel becomes positive there \citep{richards_geoid_1984,hager_lower_1985}.
+In our core model with the $\times30$ jump, the kernel is negative at \qty{150}{km} at every degree; at degrees 3--8 it is positive in a band around \qtyrange{300}{800}{km}; at degree 2 it stays negative at all depths (Section~\ref{sec:kernel-signs}).
+So the geoid alone cannot tell a dense anomaly at one depth from a light one at another.
+The topography kernel does not change sign: in the core model a dense anomaly at any depth pulls the surface down, most strongly when shallow.
+Each kernel is still a depth average, so one coefficient of each gives two weighted averages, not a depth profile.
+Depth information comes from the different shapes of the two kernels, from how they change with degree, and from the prior's assumption that $R(z)$ is shared by all degrees.
+That is why the two observables are inverted together.
+
+\section{The signs of the kernels in this model}
+\label{sec:kernel-signs}
+Geoid kernel $N$ (\si{m} per \si{kg/m^3} per \si{m} of sheet) of the core model, $\times30$ jump, computed with \texttt{MantleFlow} and the closed form of Chapter~\ref{ch:core}:
+\begin{center}
+\small
+\begin{tabular}{rrrrrrrrr}
+\toprule
+$\ell$ & \qty{150}{km} & 300 & 500 & 800 & 1200 & 1800 & 2400 & 2800\\
+\midrule
+2 & $-6.2$ & $-3.1$ & $-0.8$ & $-5.6$ & $-11.3$ & $-12.6$ & $-7.6$ & $-1.7$\\
+3 & $-4.9$ & $+0.4$ & $+4.8$ & $+0.5$ & $-5.4$ & $-7.5$ & $-4.7$ & $-1.0$\\
+4 & $-4.1$ & $+2.2$ & $+7.9$ & $+4.4$ & $-1.2$ & $-3.7$ & $-2.5$ & $-0.6$\\
+8 & $-3.9$ & $+0.8$ & $+6.1$ & $+4.8$ & $+1.5$ & $+0.1$ & $-0.1$ & $0.0$\\
+\bottomrule
+\end{tabular}
+\\[0.3em] (units of $10^{-6}$; the topography kernel is negative at every depth and degree)
+\end{center}
+The degree-2 kernel is negative throughout, which differs from the classical incompressible result for a $\times30$ jump, where it is positive in the lower mantle \citep{hager_lower_1985}.
+Before relying on this, check it: compute the same kernel with compressibility and self-gravitation switched off, and compare with Hager et al.'s figure.
+
+\section{Why a linear--Gaussian inversion}
+
+\begin{decision}{Linear forward model, Gaussian priors and errors}
+\textbf{Choice.} Linearise everything about a reference state, so that the forward problem is a linear operator $G$, and take Gaussian priors and Gaussian data errors.
+
+\textbf{Alternatives.} A nonlinear forward model (for example the exact mass of a column rather than its first-order change), or non-Gaussian priors explored by sampling.
+
+\textbf{Why.}
+\begin{itemize}[nosep]
+\item The posterior is then Gaussian and known exactly: its mean and covariance follow from linear algebra, with no sampling error.
+\item Uncertainty propagates analytically from the data to the density, so every number in the result has an error bar that is not itself uncertain.
+\item The evidence (the probability of the data under the model) is exact, which allows models and priors to be compared by Bayes factors (Chapter~\ref{ch:inversion}).
+\item The instantaneous-flow problem is genuinely linear in the density for a fixed viscosity, so the only linearisation is in the lithosphere, where its error is measured (Chapter~\ref{ch:lithosphere}).
+\end{itemize}
+\textbf{Cost.} Viscosity must be fixed for each inversion (its effect is assessed separately by viscosity kernels and by repeating the inversion for several profiles), and the lithospheric linearisation carries a measured error of a few per cent.
+\end{decision}
+
+\section{Building up a more physical forward model}
+
+\begin{decision}{Start simple, add physics one assumption at a time; invert twice}
+\textbf{Choice.} Start from the simplest forward model that is consistent with how oceanic residual depths are measured (the core model), and make it more physical one assumption at a time: an elastic plate on land and sea, the lithosphere as unknowns about WINTERC-G, and the real, self-gravitating ocean with a sea-level constant.
+There are two inversions: the core model with oceanic residual depths and the geoid (a single 1D scaling, Chapter~\ref{ch:single}), and the full model with total topography and the geoid (the perturbation about WINTERC-G).
+The intermediate stages are steps in building the forward model, not inversions.
+
+\textbf{Alternatives.} Present the full model at once and use it for everything; or invert at every stage.
+
+\textbf{Why.}
+\begin{itemize}[nosep]
+\item Each extension removes one assumption that fails for one observable, so every piece of the model has a reason that can be stated in a sentence, with a number attached: water-loading overestimates land deflection by a factor of 1.44; putting the moved mass at \qty{105}{km} changes the low-degree geoid by factors of 0.2--3; and so on.
+\item Each stage reduces to the previous one in a stated limit, so each is verified by forward comparison against something simpler: the full model in the core limit reproduces flowkernels to $10^{-10}$, and at the oceanic points it agrees with the core model to \qtyrange{1}{4}{\percent}.
+\item The first inversion can be done, and understood, before the most uncertain parts (the reference lithosphere and its circularity with the data) enter. Its failure is what motivates the final model.
+\end{itemize}
+\textbf{Cost.} Between the two inversions the model, the data and the parametrisation all change at once, so differences in the results cannot be attributed to a single change by inversion alone.
+The forward comparisons show what each physical piece does to the prediction, and in the final inversion the decomposition of the fit into mantle, lithosphere, reference and surface parts (\texttt{ForwardModel.parts}) shows where the fit comes from.
+\end{decision}
+
+\begin{defence}
+\Q{Why not just use the full model throughout?}
+\A Because the full model's extra parts each bring their own uncertainty, above all the reference lithosphere, which was itself fitted to elevation and gravity.
+For oceanic residual depths those parts change the prediction by \qtyrange{1}{4}{\percent} (Chapter~\ref{ch:core}), far less than the data errors, so they buy nothing for the first inversion and cost transparency.
+
+\Q{Why not invert at every stage?}
+\A The intermediate stages do not change what we can learn about the mantle on their own; they make the forward model physically right for the observables of the final inversion.
+Each is justified by a forward comparison rather than an inversion.
+The one stage that would admit new data on its own, the plate on land and sea (continental points), is folded into the final inversion, which uses total topography everywhere.
+
+\Q{Which change caused the difference between the two inversions?}
+\A By inversion alone, we cannot say, because model, data and unknowns all change.
+The forward comparisons quantify each physical change, and the final inversion's breakdown by source shows which part of the model carries the fit.
+
+\Q{Is the linear-Gaussian assumption not too restrictive?}
+\A The flow problem is exactly linear in density for a fixed viscosity.
+The nonlinearity is in the viscosity, which we treat by repeating the inversion for several profiles and by adjoint kernels, and in the lithosphere, where the first-order error is \qty{4}{\percent} at degree 50 for a \qty{10}{km} change in Moho depth.
+In exchange we get an exact posterior and exact model comparison, which no sampling method gives.
+\end{defence}

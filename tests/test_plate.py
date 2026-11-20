@@ -81,45 +81,47 @@ def test_constant_plate_adjoint_and_sign(mf):
 # ------------------------------------------------------------------ land and sea
 
 
-def galerkin_reference(plate, quad_lmax):
-    """The previous implementation, kept as an independent check: (diag(1/F_flat) + g rho_w M) w = q with
-    M_ij = int (1 - C) Y_i Y_j dOmega by Gauss-Legendre quadrature, w restricted to degree <= lmax.
+def test_land_sea_recovers_a_manufactured_solution(mf):
+    """Choose w, build its load independently (bending spectrally, buoyancy as a product on a fine grid) and
+    solve: the plate must give w back. The restoring density varies smoothly (degree 1), so the load is
+    band-limited and the check is exact up to the solver tolerance. Replaces a comparison with a Galerkin
+    solve, which had a different discretisation and needed a 2 % tolerance (audit P14).
     """
     import pyshtools as pysh
 
-    L = plate.lmax
-    zero, w = pysh.expand.SHGLQ(quad_lmax)
-    lat, lon = pysh.expand.GLQGridCoord(quad_lmax)
-    LA, LO = np.meshgrid(lat, lon, indexing="ij")
-    land = 1.0 - plate.ocean(LA, LO)
-    n = (L + 1) ** 2
-    M = np.empty((n, n))
-    e = np.zeros(n)
-    for j in range(n):
-        e[j] = 1.0
-        cilm = np.zeros((2, quad_lmax + 1, quad_lmax + 1))
-        cilm[:, : L + 1, : L + 1] = ex.components_to_cilm(e, L)
-        grid = pysh.expand.MakeGridGLQ(cilm, zero, norm=4, csphase=1)
-        out = pysh.expand.SHExpandGLQ(
-            land * grid, w, zero, norm=4, csphase=1, lmax_calc=L
-        )
-        M[:, j] = ex.cilm_to_components(out, L)
-        e[j] = 0.0
-    deg, _ = ex.sphere_ordering(L)
-    K = np.diag(1.0 / plate.flat_filter()[deg]) + plate.g * plate.rho_water * 0.5 * (
-        M + M.T
+    L, L0 = LMAX, 4
+    smooth = lambda la, lo: (  # 0.5 + 0.3 x + 0.1 z: degree 1 on the sphere
+        0.5
+        + 0.3 * np.cos(np.radians(la)) * np.cos(np.radians(lo))
+        + 0.1 * np.sin(np.radians(la))
     )
-    return np.linalg.inv(K)
-
-
-def test_land_sea_matches_the_galerkin_reference(mf, land_sea):
-    """pygeoinf's matrix-free flexure (solved at 3 lmax, truncated) against an independent Galerkin solve:
-    both converge on the same answer, to within 2 % at this resolution."""
+    plate = OceanLoadedPlate.from_mantle(mf, Te=40e3, ocean=smooth, rtol=1e-13)
     Q = mf.load_space()
-    q = np.random.default_rng(6).standard_normal(Q.dim)
-    a = apply(land_sea.operator(Q), q)
-    b = galerkin_reference(land_sea, 3 * LMAX) @ q
-    assert np.linalg.norm(a - b) <= 0.02 * np.linalg.norm(b)
+    deg = np.asarray(Q.degrees)
+    w = np.where((deg >= 1) & (deg <= L0), 1.0, 0.0) * np.random.default_rng(
+        3
+    ).standard_normal(Q.dim)
+    lam = deg * (deg + 1.0)
+    bending = plate.D / plate.R**4 * (lam**2 - (1 - plate.nu) * lam) * w
+    n = 4 * L
+    zero, wq = pysh.expand.SHGLQ(n)
+    lat, lon = pysh.expand.GLQGridCoord(n)
+    LA, LO = np.meshgrid(lat, lon, indexing="ij")
+    b = plate.g * (plate.drho + plate.rho_water * (1.0 - smooth(LA, LO)))
+    cilm = np.zeros((2, n + 1, n + 1))
+    cilm[:, : L + 1, : L + 1] = ex.components_to_cilm(w, L)
+    grid = pysh.expand.MakeGridGLQ(cilm, zero, norm=4, csphase=1)
+    buoy = ex.cilm_to_components(
+        pysh.expand.SHExpandGLQ(b * grid, wq, zero, norm=4, csphase=1, lmax_calc=L), L
+    )
+    got = apply(plate.operator(Q), bending + buoy)
+    assert np.allclose(got, w, rtol=0, atol=1e-9 * np.abs(w).max())
+
+
+def test_variable_rigidity_has_no_constant_filter(mf):
+    plate = OceanLoadedPlate.from_mantle(mf, Te=lambda la, lo: 40e3 + 0 * la)
+    with pytest.raises(ValueError):
+        plate.filter()
 
 
 def test_assembled_matrix_is_the_operator(mf, land_sea):

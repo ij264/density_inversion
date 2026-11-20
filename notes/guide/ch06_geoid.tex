@@ -1,0 +1,95 @@
+\chapter{The geoid of the full model}
+\label{ch:geoid}
+
+In the core model every moved mass sits either in the mantle or at the surface.
+In the full model the lithosphere has structure, so the mass moved by a deflection sits at several depths, and those depths vary laterally.
+This chapter explains how the geoid is computed in that case, and why the care is needed.
+
+\section{Every mass, at its own depth}
+
+The geoid is $N = -\Phi/g_0$ at the surface, so a mass excess raises it.
+Five kinds of mass contribute.
+\begin{enumerate}[nosep]
+\item The mantle anomaly and the CMB it deflects, from $K_N$ (Chapter~\ref{ch:flow}).
+\item The lithospheric perturbations (Chapter~\ref{ch:lithosphere}), each a sheet $\sigma(x) = f(x)\,u(x)$ at its own local depth.
+\item The plate's deflection $w$: lifting a column by $w$ puts a sheet $\Delta\rho_i(x)\,w(x)$ on every density contrast $i$ of the column:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Contrast & Sheet density per unit $w$ \\
+\midrule
+ice top & $\rho_{\mathrm{ice}} - \rho_w C(x)$ (where there is ice)\\
+surface & $\rho_c(x) - \rho_{\mathrm{ice}}$ under ice, otherwise $\rho_c(x) - \rho_w C(x)$ \\
+Moho & $\rho_{\mathrm{lid,top}}(x) - \rho_c(x)$\\
+lid & the lid's own gradient, one sheet per piece between WINTERC-G knots\\
+base & $\rho_{\mathrm{LAB}} - \rho_{\mathrm{lid,bottom}}(x)$, at $T$ below the column's surface\\
+\bottomrule
+\end{tabular}
+\end{center}
+These add up to $\rho_{\mathrm{LAB}}-\rho_w C(x)$, the same contrast as the plate's restoring force.
+That telescoping sum is the consistency check: the total moved mass is the same in the force balance and in the geoid.
+(Under floating ice, where $C=1$, the ice-top row gives $\rho_{\mathrm{ice}}-\rho_w$. Physically floating ice does not move with the bedrock, and the contrast belongs at the seafloor; the total is unchanged and the depth error is only the ice thickness.)
+\item The reference lithosphere itself, a fixed term.
+\item The ocean that follows the geoid (Chapter~\ref{ch:ocean}).
+\end{enumerate}
+
+\begin{decision}{Sheets at their own depth, not at a mean depth}
+\textbf{Choice.} Each sheet is placed at its local depth $d_i(x)$, which varies laterally.
+
+\textbf{Alternative.} Place each sheet at its mean depth, which keeps the operator diagonal in degree.
+
+\textbf{Why.} The geoid of a compensated structure is a small difference between the attraction of the load and that of its compensation, so it depends on the depth difference between them.
+For a Pacific-type example, the Moho sheet contributes $+17.0$ and its compensation $-17.2$\,m, a net $\qty{-0.24}{m}$.
+Placing the sheets at their mean depths gives $\qty{-0.70}{m}$, three times too large.
+A brute-force numerical integral gives $\qty{-0.248}{m}$.
+\end{decision}
+
+\section{Sheets at variable radius}
+
+A sheet at radius $r(x) = R - d(x)$ has the external potential
+\[
+    \Phi_{\ell m}(R) = -\frac{4\pi G R}{2\ell+1}\int \sigma(x)\left(\frac{r(x)}{R}\right)^{\ell+2} Y_{\ell m}(x)\,\mathrm{d}\Omega .
+\]
+The factor $(r/R)^{\ell+2}$ depends on position, so it cannot be pulled out of the integral.
+We expand it about a common radius $r_c$:
+\[
+    \left(\frac{r}{R}\right)^{\ell+2} = \left(\frac{r_c}{R}\right)^{\ell+2}\exp\!\left[(\ell+2)\ln\frac{r}{r_c}\right]
+    = \left(\frac{r_c}{R}\right)^{\ell+2}\sum_{k\ge0}\frac{(\ell+2)^k}{k!}\left(\ln\frac{r}{r_c}\right)^k .
+\]
+Each term is a product of a known field, $(\ln r/r_c)^k\,\sigma(x)/k!$, which is expanded in harmonics once, and a degree-dependent factor $(\ell+2)^k$.
+The series converges because each term is smaller by roughly $(\ell+2)|\ln(r/r_c)|/k$; $\ln(r/r_c)$ is only about \qty{1.6}{\percent} across a \qty{105}{km} column, but at high degree $(\ell+2)|\ln(r/r_c)|$ reaches about 2, so some 20 terms are needed. It is truncated at a relative tolerance of $10^{-10}$.
+The method is exact for laterally varying depth, and agrees with a brute-force integral to $10^{-9}$.
+
+\section{Two checks of the whole geoid}
+
+\paragraph{The limit test.}
+With no plate strength, water everywhere and a uniform lithosphere of density $\rho_{\mathrm{LAB}}$, all the deflection sheets collapse to a single sheet $(\rho_{\mathrm{LAB}}-\rho_w)w$.
+If that sheet is moved analytically from the surface to $r_{\mathrm{top}}$, the full model must reproduce flowkernels' own geoid $K_N^{\mathrm{fk}}$ and topography $K_{h0}$.
+It does, to $10^{-10}$.
+This is the test that settles whether the mass removed from flowkernels' geoid and the mass added back are the same.
+
+\paragraph{A synthetic Earth.}
+For a whole synthetic lithosphere, the reference structure's own geoid has an rms of \qty{359}{m} and the geoid of its isostatic deflection an rms of \qty{346}{m}, of opposite sign; their sum has an rms of only \qty{14.8}{m}, about \qty{4}{\percent} of either part.
+This shows why every per-cent-level choice in the lithosphere matters for the geoid: errors in either large term appear undiluted in the small difference.
+
+\begin{defence}
+\Q{Your reference geoid is a \qty{4}{\percent} remainder of two large terms. How can you trust it?}
+\A Each term is computed exactly for the model as stated, with the sheets at their own depths, and the sum is checked against brute-force integration and against the limit test.
+What is uncertain is the model, not the arithmetic: the one-$g$ approximation, the planar mass balance and the linearisation each move the remainder by up to \qtyrange{10}{15}{\percent}.
+That is why the geoid's modelling error is carried as a covariance term and not ignored.
+
+\Q{Where do you put the Moho sheet: at the unperturbed Moho or at the centroid of the perturbation?}
+\A At the unperturbed Moho, which is the first-order choice.
+Moving it to the centroid changes the geoid by about \qty{15}{\percent} of the total in the test case; both are second order in the perturbation, but the cancellation amplifies them.
+\end{defence}
+
+\begin{incode}{\texttt{src/density\_inversion/forward/geoid.py}}
+\begin{itemize}[nosep]
+\item \texttt{Geoid.sheet\_factor}: $S_\ell(r)$ per component, zero at degrees 0 and 1.
+\item \texttt{sheet}, \texttt{sheets}: $\sigma\mapsto N$ for a sheet at constant radius, and for sheets at laterally varying depth (the $\ln(r/r_c)$ series).
+\item \texttt{mantle\_operator}: $\delta\rho_m\mapsto N$ through $K_N$.
+\item \texttt{lithosphere\_operator}: the perturbation sheets, each at its own depth (\texttt{lithosphere\_depths}).
+\item \texttt{deflection\_sheets}, \texttt{deflection\_operator}: the contrasts of the table above, and $w\mapsto N$.
+\item \texttt{reference\_layers}, \texttt{reference}: the reference column as exact sheets, and its own geoid.
+\end{itemize}
+\end{incode}

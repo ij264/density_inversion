@@ -1,0 +1,58 @@
+\documentclass[11pt,a4paper,oneside]{book}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{siunitx}
+\usepackage{booktabs,longtable,array}
+\usepackage[round]{natbib}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{patterns,arrows.meta}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\definecolor{decisionc}{HTML}{0F6E6E}
+\definecolor{defencec}{HTML}{8A4B08}
+\definecolor{codec}{HTML}{3B3B8F}
+
+\newtcolorbox{decision}[1]{enhanced,breakable,colback=decisionc!5,colframe=decisionc,fonttitle=\bfseries,title={Decision: #1}}
+\newtcolorbox{defence}{enhanced,breakable,colback=defencec!5,colframe=defencec,fonttitle=\bfseries,title={Defending it}}
+\newtcolorbox{incode}[1]{enhanced,breakable,colback=codec!4,colframe=codec,fonttitle=\bfseries,title={In the code: #1}}
+
+\lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,keepspaces=true,frame=none,backgroundcolor=\color{codec!4}}
+
+\newcommand{\Q}[1]{\par\textbf{Q: }\emph{#1}\par}
+\newcommand{\A}{\par\textbf{A: }}
+
+\title{The forward problem and the first inversion\\[0.5em]\large A guide to the theory, the modelling decisions and the code\\for Chapter 3: mantle density from topography and the geoid}
+\author{Written by Claude (AI assistant) for Issac Jacob}
+\date{19 November 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\input{ch00_preface}
+\input{ch01_problem}
+\input{ch02_flow}
+\input{ch03_core}
+\input{ch04_plate}
+\input{ch05_lithosphere}
+\input{ch06_geoid}
+\input{ch07_ocean}
+\input{ch08_assembly}
+\input{ch09_inversion}
+\input{ch10_single_scaling}
+\input{ch11_ledger}
+\appendix
+\input{appA_conventions}
+\input{appB_files}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}
