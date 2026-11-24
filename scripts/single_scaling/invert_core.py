@@ -11,6 +11,15 @@ R ~ N(0, sigma_R^2 SE(ell_R) + SIGMA_MU^2 11^T) on 28 nodes (a common offset mar
 Holdt points are averaged in 1-degree cells (see thin). Hyperparameters by maximum evidence within physical bounds (Joint.BOUNDS); null model R = 0.
 
 Usage: PYTHONPATH=src ~/pgenv/bin/python scripts/single_scaling/invert_core.py core_<...>.npz {topo,geoid,joint}
+           [--datum {lab,cut105}] [--starts N]
+  --datum lab    (default) the product's datum: WINTERC-G's lithosphere removed down to its LAB; variance LAB + crust
+                 + satellite + hydrostatic.
+  --datum cut105 the lithosphere removed down to 105 km, the top of the core model's flow domain, so that no material
+                 is both removed from the data and represented by the mantle unknown (added 23 Nov 2026). The LAB
+                 variance does not apply; the crustal variance is the product's (computed for the cut at the LAB).
+  --starts N     N Nelder-Mead starts for the hyperparameters (the first at the default point, the rest perturbed by
+                 one unit in each log-parameter); the best is kept and the spread of logZ is reported.
+Outputs are suffixed with the datum when it is not 'lab'.
 """
 import json
 import sys
@@ -39,7 +48,10 @@ def thin(lat, lon, d, s, rows):
     return avg(lat), avg(lon), avg(d), np.sqrt(avg(s ** 2)), [avg(r) for r in rows]
 
 
-def geoid_data():
+CUT105 = Path(__file__).resolve().parents[3] / "ch2_density" / "geoid" / "cache" / "N_lith_cut105.npy"
+
+
+def geoid_data(datum="lab"):
     """Geoid datum and covariance, degrees 2-25 without C21/S21.
 
     C_N is diagonal: the product's var_total (LAB + crust + satellite, floored at 0.2 x the within-degree median),
@@ -53,12 +65,14 @@ def geoid_data():
     hyd = np.zeros(l.size)
     hyd[(l == 2) & (m == 0)] = 1.0 ** 2
     hyd[(l == 4) & (m == 0)] = 0.2 ** 2
-    var_sum = g["var_lab"] + g["var_crust"] + g["var_satellite"] + hyd
+    var_lab = g["var_lab"] if datum == "lab" else 0.0 * g["var_lab"]
+    var_sum = var_lab + g["var_crust"] + g["var_satellite"] + hyd
     var = var_sum.copy()
     for L in np.unique(l):
         s = l == L
         var[s] = np.maximum(var_sum[s], 0.20 * np.median(var_sum[s]))
-    dk, lk = g["d"][keep], l[keep]
+    d = g["d"] if datum == "lab" else g["N_obs"] - np.load(CUT105)
+    dk, lk = d[keep], l[keep]
     power = np.array([np.mean(dk[lk == L] ** 2) for L in lk])  # observed power per coefficient at each degree
     return dk, var[keep], power, keep, lk
 
@@ -152,18 +166,28 @@ class Joint:
         Hinv = cho_solve(Hf, np.eye(n))
         return logZ, m + Hg, Hinv, Pinv
 
-    def fit(self):
+    def fit(self, starts=1, seed=0):
         x0 = ([np.log(400.0), np.log(1000e3)] if self.topo is not None else []) + \
              ([np.log(0.3)] if self.geoid is not None else []) + ([np.log(0.1), np.log(400.0)] if self.mantle else [])
         if not x0:
             return {}, self.solve({}, full=False)
-        r = minimize(lambda x: -self.solve(self.unpack(x), full=False), np.array(x0), method="Nelder-Mead",
-                     options=dict(maxiter=6000, xatol=1e-4, fatol=1e-3))
-        return self.unpack(r.x), -r.fun
+        rng = np.random.default_rng(seed)
+        best, self.start_logZ = None, []
+        for k in range(starts):
+            xs = np.array(x0) + (rng.normal(0.0, 1.0, len(x0)) if k else 0.0)
+            r = minimize(lambda x: -self.solve(self.unpack(x), full=False), xs, method="Nelder-Mead",
+                         options=dict(maxiter=6000, xatol=1e-4, fatol=1e-3))
+            self.start_logZ.append(float(-r.fun))
+            if best is None or r.fun < best.fun:
+                best = r
+        return self.unpack(best.x), -best.fun
 
 
 def main():
     gname, mode = sys.argv[1], sys.argv[2]
+    opt = dict(zip(sys.argv[3::2], sys.argv[4::2]))
+    datum, starts = opt.get("--datum", "lab"), int(opt.get("--starts", 1))
+    tag = f"{Path(gname).stem}_{mode}" + ("" if datum == "lab" else f"_{datum}")
     c = np.load(OUT / gname)
     z = c["nodes_km"]
     topo = geoid = None
@@ -176,13 +200,13 @@ def main():
         print(f"{raw.shape[0]} Holdt points -> {d.size} one-degree cells", flush=True)
         topo = (Gh, d, s, Yt, deg[deg >= 1])
     if mode in ("geoid", "joint"):
-        dN, vN, PN, keep, gl = geoid_data()
+        dN, vN, PN, keep, gl = geoid_data(datum)
         geoid = (c["G_geoid"][keep], dN, vN, PN)
     res = {}
     for name, mantle in (("null", False), ("scaling", True)):
         p = Joint(z, topo, geoid, mantle)
-        th, logZ = p.fit()
-        out = dict(logZ=float(logZ), hyper={k: float(v) for k, v in th.items()})
+        th, logZ = p.fit(starts)
+        out = dict(logZ=float(logZ), hyper={k: float(v) for k, v in th.items()}, start_logZ=getattr(p, "start_logZ", []))
         if mantle:
             _, pm, pc, Pinv = p.solve(th)
             iR = slice(p.nc, p.nc + p.nr)
@@ -208,14 +232,16 @@ def main():
                                     chi2_n_total=float(np.mean((dN - pr) ** 2 / v)),
                                     corr=float(np.corrcoef(pr, dN)[0, 1]))
                 out["geoid_corr_by_degree"] = {int(L): float(np.corrcoef(pr[gl == L], dN[gl == L])[0, 1]) for L in range(2, 9)}
-            np.savez(OUT / f"posterior_{Path(gname).stem}_{mode}.npz", R_mean=R, R_cov=Cp, R_prior_cov=Cprior, nodes_km=z)
+            np.savez(OUT / f"posterior_{tag}.npz", R_mean=R, R_cov=Cp, R_prior_cov=Cprior, nodes_km=z)
         res[name] = out
     res["log_bayes_factor"] = res["scaling"]["logZ"] - res["null"]["logZ"]
     s = res["scaling"]
     print(mode, "logBF", round(res["log_bayes_factor"], 1), "hyper", {k: round(v, 3) for k, v in s["hyper"].items()},
           "trRes", round(s["trace_resolution"], 1), "topo", s.get("topo"), "geoid", s.get("geoid"), flush=True)
     print("R(z):", ", ".join(f"{zz:.0f}:{r:+.3f}±{sd:.3f}" for zz, r, sd in zip(z, s["R_mean"], s["R_sd"])))
-    (OUT / f"result_{Path(gname).stem}_{mode}.json").write_text(json.dumps(res, indent=1))
+    res["datum"], res["starts"] = datum, starts
+    print("logZ over starts (scaling):", [round(v, 1) for v in s["start_logZ"]])
+    (OUT / f"result_{tag}.json").write_text(json.dumps(res, indent=1))
 
 
 if __name__ == "__main__":
